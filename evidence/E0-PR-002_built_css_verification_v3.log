@@ -1,0 +1,8 @@
+
+> web@0.0.0 verify:re-astryx-built
+> node scripts/verify-re-astryx-built-css.mjs
+
+E0-PR-002 built CSS verification PASSED
+- inspected /home/runner/work/CEN-Value-RE/CEN-Value-RE/web/dist/assets/ReShell-ucBbgxv_.css
+- no :root/html[data-theme]/body global selectors remain in the RE CSS asset
+- Astryx token declarations remain present inside the scoped asset

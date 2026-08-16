@@ -1,0 +1,2 @@
+E0-PR-002 built CSS verification FAILED
+- Built RE CSS (/tmp/e0-pr-002-root-leak.css) still contains forbidden global selector(s): :root

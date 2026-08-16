@@ -1,0 +1,17 @@
+
+> web@0.0.0 build
+> vite build
+
+[36mvite v8.1.0 [32mbuilding client environment for production...[36m[39m
+[2Ktransforming...✓ 2052 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                             0.45 kB │ gzip:   0.29 kB
+dist/assets/cenvalue-logo-DAXmZm-0.png     30.57 kB
+dist/assets/index-D80jgUSH.css              2.56 kB │ gzip:   0.99 kB
+dist/assets/ReShell-CIfVNEiq.css          147.50 kB │ gzip:  25.07 kB
+dist/assets/Tooltip-B8lbCkfo.js             0.06 kB │ gzip:   0.07 kB
+dist/assets/ReShell-B-lsjD7R.js           222.07 kB │ gzip:  66.30 kB
+dist/assets/index-1Eb6DKKR.js           2,395.01 kB │ gzip: 704.54 kB
+
+[32m✓ built in 1.13s[39m

@@ -1,0 +1,24 @@
+
+> web@0.0.0 build
+> npm run prepare:re-astryx-css && vite build
+
+
+> web@0.0.0 prepare:re-astryx-css
+> node scripts/generate-re-astryx-css.mjs
+
+E0-PR-002 scoped Astryx CSS generated
+- src/re/generated/astryx-core.scoped.css
+- src/re/generated/neutral-theme.scoped.css
+[36mvite v8.1.0 [32mbuilding client environment for production...[36m[39m
+[2Ktransforming...✓ 2011 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                             0.45 kB │ gzip:   0.29 kB
+dist/assets/cenvalue-logo-DAXmZm-0.png     30.57 kB
+dist/assets/index-D80jgUSH.css              2.56 kB │ gzip:   0.99 kB
+dist/assets/ReShell-ucBbgxv_.css          148.03 kB │ gzip:  25.08 kB
+dist/assets/Tooltip-DFLtTxzP.js             0.06 kB │ gzip:   0.07 kB
+dist/assets/ReShell-C2GEe5eJ.js           197.94 kB │ gzip:  59.28 kB
+dist/assets/index-c-kBV_Gx.js           2,395.01 kB │ gzip: 704.53 kB
+
+[32m✓ built in 1.30s[39m

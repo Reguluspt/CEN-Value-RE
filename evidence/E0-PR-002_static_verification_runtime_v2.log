@@ -1,0 +1,10 @@
+
+> web@0.0.0 verify:re-astryx
+> node scripts/verify-re-astryx-spike.mjs
+
+E0-PR-002 static verification PASSED
+- exact Astryx dependency pins present
+- /re route is protected, lazy-loaded, and outside legacy Layout
+- AppShell + SideNav + FormLayout + TextInput present
+- RE shell imports only React, Astryx, and its scoped stylesheet
+- global Astryx reset/:root/body overrides excluded

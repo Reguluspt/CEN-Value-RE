@@ -1,0 +1,6 @@
+E0-PR-002 browser smoke PASSED
+- /re rendered as mocked admin
+- two Astryx TextInput controls rendered
+- /dashboard computed styles unchanged after client-side /re visit
+- /cases computed styles unchanged after client-side /re visit
+- browser page errors: 0
