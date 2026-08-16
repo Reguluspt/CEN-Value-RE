@@ -19,271 +19,210 @@ Delivery follows vertical slices, not isolated module-first implementation.
 
 Primary dependency chain:
 
-`R0 Repository Baseline → Epic 0 Foundation → Epic 1 Walking Skeleton → Epic 2 CTXD/Rich Property → Epic 3 GCN/Location → Epic 4 Historical Learning → Epic 5 Approval Round-trip → Epic 6 Productivity/MVP+ → Epic 7 Pilot Hardening/RC → Excel Qualification PASS → Release 1.0`.
-
-Every Epic must produce reviewable acceptance evidence. No Epic may silently redefine frozen canonical contracts.
+`R0 Repository Baseline → Epic 0 Engineering Foundation → Epic 1 Manual Walking Skeleton → Epic 2 CTXD & Rich Property → Epic 3 GCN/Location → Epic 4 Historical Learning → Epic 5 Lifecycle/Approval Round-trip → Epic 6 Productivity/MVP+ → Epic 7 Pilot Hardening/RC → Excel Qualification PASS → CenValue RE 1.0`
 
 ## 3. R0 — Repository Baseline
 
-### Objective
-Create a stable GitHub engineering baseline before further implementation expands.
+Objective: establish GitHub as the reviewable engineering source of truth while the Library remains the canonical project workspace/reference corpus.
 
-### Deliverables
-- Complete PR #1 with reviewable engineering artifacts.
-- Keep sample/reference binaries (`*.pdf`, `*.xlsx`, `*.zip`) in the project Library only.
-- Version Design Book, Gate A/B, Epic 0 packets, corrective records, fixtures, mappings, patches, logs and reports.
-- Merge the approved initial import into `main`.
-
-### Exit gate
-- Intended version-controlled project baseline is present in PR #1.
-- No unintended PDF/XLSX/ZIP assets are committed.
-- PR reviewed and merged.
-- `main` becomes the GitHub engineering source-of-truth baseline.
+Exit gate:
+- reviewable Design Book, Gate A/B, Epic 0, corrective, fixtures, patches, evidence and reports are present in PR #1;
+- sample/reference `*.pdf`, `*.xlsx`, `*.zip` remain Library-only by approved policy;
+- `BRAINSTORM Full.md` remains provenance-only in Library;
+- integrity is checked against current Library content;
+- PR #1 is reviewed and merged before `main` becomes the baseline of record.
 
 ## 4. Epic 0 — Engineering Foundation
 
-### Objective
-Build the minimum production-grade foundation without coupling domain logic to legacy Excel, Flask, Tauri, Astryx, database frameworks or provider SDKs.
+Objective: create production-grade boundaries without prematurely building appraisal features.
 
-### Work packages
-1. **E0-PR-001 — Architecture Boundary Guard** — ACCEPTED.
-2. **E0-PR-002 — Astryx Integration Spike** — implementation/static evidence prepared; runtime acceptance pending.
-3. **E0-PR-003 — Decimal + RoundingPolicy**.
-4. **E0-PR-004 — ExcelTemplateProfile infrastructure**.
-5. **E0-PR-005 — Golden Fixture Harness**.
-6. **E0-PR-006 — Local Service Boundary**.
-7. **E0-PR-007 — Encrypted Persistence Foundation**.
-8. **E0-PR-008 — Windows Excel Qualification Harness**.
+Work sequence:
+1. E0-PR-001 — RE Domain Skeleton + Import Boundaries — **ACCEPTED**.
+2. E0-PR-002 — Astryx Integration Spike — implementation/static evidence prepared; runtime acceptance pending.
+3. E0-PR-003 — Decimal + RoundingPolicy.
+4. E0-PR-004 — ExcelTemplateProfile + Fingerprint.
+5. E0-PR-005 — Golden Fixture Harness.
+6. E0-PR-006 — Local Service Bootstrap Boundary.
+7. E0-PR-007 — Encrypted RE Persistence Foundation.
+8. E0-PR-008 — Windows Excel Qualification Harness Skeleton.
 
-### Foundation rules
-- `5% = Decimal("0.05")` in the canonical domain.
-- Effective construction age uses `appraisal_date`, never `YEAR(NOW())`.
-- Preserve raw and rounded valuation results separately.
-- Domain imports no React/Astryx, Flask/Tauri, Excel libraries, DB frameworks or provider SDKs.
-- Local service is loopback-only with per-launch session/bootstrap credentials.
-- RE persistence is separate and encrypted at rest.
+Epic 0 exit gate:
+- architecture boundaries enforced;
+- Astryx surface runtime accepted without legacy CSS regression;
+- deterministic Decimal/Rounding primitives accepted;
+- template fingerprint/fail-safe accepted;
+- golden fixture harness operational;
+- loopback/session boundary accepted;
+- encrypted RE DB/migrations/repository abstraction accepted;
+- Excel qualification harness cannot falsely report PASS;
+- CI/focused evidence green.
 
-### Exit gate
-- Architecture guards green.
-- Astryx runtime integration accepted.
-- Decimal/RoundingPolicy tests green.
-- Excel template fingerprinting works and rejects deliberate mutations.
-- Golden fixture loads and is testable without requiring Excel for normal unit tests.
-- Local service and encrypted persistence baseline accepted.
-- CI green.
+## 5. Epic 1 — Manual Walking Skeleton
 
-## 5. Epic 1 — Walking Skeleton: Manual Case → Excel
+Vertical slice:
 
-### Objective
-Prove the canonical data model, calculation engine and Excel adapter through one manual end-to-end appraisal flow.
+`Create Case → Manual TSTĐ → Manual TSSS01/02/03 → Market Normalization → Adjustment C1–C11 → Comparable Quality → Human Indicated Price → Land/Valuation Result → Excel Output`
 
-### Flow
-`Case Portfolio → Create Case → Manual TSTĐ → Manual TSSS → Market Normalization → Adjustment C1–C11 → Comparable Quality → Valuation Result → Rounding → Excel Output`.
+Goals:
+- prove canonical case/property/comparable contracts;
+- implement deterministic adjustment/calculation engine;
+- preserve explicit 0% versus missing;
+- calculate comparable quality and 15% readiness control;
+- retain human final selection;
+- generate workbook through ExcelTemplateProfile.
 
-### Required capabilities
-- Case creation, autosave, resume and archive.
-- Structured TSTĐ entry.
-- TSSS Quick/Expanded Entry.
-- Market normalization distinct from comparison adjustments.
-- Adjustment Engine with explicit-zero semantics.
-- Comparable quality metrics and human selection.
-- Final valuation with separate before-rounding and final-rounded values.
-- Excel output through `ExcelTemplateProfile`.
+Golden checkpoints include indicated prices, H119, land total, CTXD total, total before rounding and final rounded value.
 
-### Golden acceptance targets
-Golden case must reproduce intermediate and final checkpoints, not only the final total, including:
-- indicated comparable prices;
-- `H119 = 196,308,000`;
-- land value `18,428,442,440`;
-- raw total `19,581,412,440`;
-- rounded total `19,581,000,000`.
-
-### Exit gate
-Manual closed calculation loop passes against frozen golden checkpoints and tolerance rules.
+Exit gate: canonical engine and required Excel checkpoints agree under declared rounding/tolerance; no hidden workbook behavior becomes canonical by accident.
 
 ## 6. Epic 2 — CTXD & Rich Property
 
-### Objective
-Complete physical-property modeling and construction valuation.
+Goals:
+- zero/one/multiple `ConstructionAsset`;
+- legal registration status separate from physical existence;
+- `VALUE | DESCRIBE_ONLY | EXCLUDE` treatment;
+- appraisal-date effective age;
+- age and expert/component remaining-quality methods;
+- replacement cost and remaining value;
+- same Construction Engine for TSTĐ and TSSS.
 
-### Required capabilities
-- Zero, one or multiple `ConstructionAsset` records per property.
-- CTXD may be present physically even when absent from GCN.
-- Support `VALUE` and `DESCRIBE_ONLY` treatment.
-- TSTĐ and TSSS use the same Construction Engine.
-- Replacement cost, age method, expert/component method, remaining quality and remaining value.
+Exit gate: representative CTXD scenarios calculate, persist, audit and export correctly.
 
-### Exit gate
-Representative CTXD cases persist, calculate and export correctly and match Excel checkpoints.
+## 7. Epic 3 — GCN & Location Intelligence
 
-## 7. Epic 3 — GCN / Document Intelligence & Location
+Pipeline:
 
-### Objective
-Reduce manual input while preserving deterministic canonical contracts and human confirmation.
+`Image/PDF → preprocessing → OCR/Vision → semantic parser → staging/reconciliation → human review → canonical property`
 
-### GCN pipeline
-`Image/PDF → Preprocess → OCR/Vision → Semantic Parser → Staging/Reconciliation → Human Review → Canonical Property`.
+Goals:
+- OCR/provider abstraction;
+- QR best-effort, never workflow-blocking;
+- VBDLIS/manual-assisted registry path;
+- Google Maps URL → canonical lat/lng with raw URL provenance;
+- manual fallback when online services are unavailable.
 
-### Rules
-- OCR output never writes directly to canonical data.
-- QR is best-effort and never blocks workflow.
-- VBDLIS is a provider/source, not an unquestioned source-of-truth.
-- Conflicts require reconciliation and human review.
-- Manual entry must remain available when OCR/provider/network fails.
-
-### Location
-`Google Maps URL → resolver → latitude/longitude`, preserving raw URL for provenance.
-
-### Exit gate
-Manual and GCN-assisted intake converge to the same canonical property contract after confirmation.
+Exit gate: manual and GCN-assisted creation converge to the same canonical contract after human confirmation.
 
 ## 8. Epic 4 — Historical Learning
 
-### Objective
-Generate reproducible adjustment suggestions from curated historical appraisal workbooks.
+Pipeline:
 
-### Pipeline
-`Curated Historical Excel → Template Fingerprint → Deterministic Extractor → Normalized Cases → AdjustmentObservation → Quality Gate → Statistics/Similarity → Suggested Rate`.
+`Curated Historical Excel → Template Fingerprint → Deterministic Extraction → Normalized Cases → AdjustmentObservation → Quality Gate → Statistical Similarity → Suggested Rate`
 
-### Rules
-- Deterministic before AI.
-- Preserve workbook/case provenance.
-- Distinguish explicit `0%` from missing/unfilled values.
-- `suggested_rate` and appraiser `selected_rate` are distinct.
-- Later approval lineage preserves suggested → appraiser → approved values where supported.
+Rules:
+- deterministic before AI;
+- provenance preserved;
+- explicit 0% distinguished from missing;
+- suggested rate never overwrites appraiser selection;
+- approved/appraiser/suggested lineage retained.
 
-### Minimum suggestion evidence
-- suggested rate;
-- sample size;
-- median;
-- P25/P75;
-- confidence/quality metadata;
-- dataset snapshot/version;
-- source provenance.
+Exit gate: a qualified historical corpus produces reproducible suggestions traceable to source workbooks/cases.
 
-### Exit gate
-At least one curated historical corpus produces reproducible suggestions traceable to source workbooks/cases.
+## 9. Epic 5 — Lifecycle & Approval Round-trip
 
-## 9. Epic 5 — Case Lifecycle & Approval Round-trip
+Lifecycle:
 
-### Objective
-Close the real operational appraisal workflow.
+`DRAFT → IN_PROGRESS → READY_FOR_APPROVAL → EXPORTED_FOR_APPROVAL → APPROVAL_RETURNED → REVISION_REQUIRED | APPROVED → CLOSED`
 
-### Lifecycle
-`DRAFT → IN_PROGRESS → READY_FOR_APPROVAL → EXPORTED_FOR_APPROVAL → APPROVAL_RETURNED → REVISION_REQUIRED | APPROVED → CLOSED`.
+Approval flow:
 
-### Approval flow
-`Export R01 → immutable ApprovalSubmission → returned workbook → matching TemplateProfile read → diff → human confirmation → approve or revise`.
+`Export R01 → immutable ApprovalSubmission → returned workbook → profile-matched read → diff → human confirmation → approval/revision → R02...`
 
-### Rules
-- Every export keeps immutable revision, timestamp, workbook/template identity and submitted snapshots.
-- Returned workbooks never blindly overwrite canonical data.
-- Appraiser and approval decisions remain separate.
-- If only final result changes, do not invent an adjustment change.
-- Revision chain R01 → Returned → R02... remains auditable.
+Rules:
+- returned workbook never blindly overwrites canonical data;
+- appraiser and approval decisions remain distinct;
+- revision history is immutable;
+- changing only final value must not fabricate an adjustment change.
 
-### Exit gate
-A real case can complete export, returned approval, revision and final close without losing provenance or revision history.
+Exit gate: a case completes R01 → returned → revision → R02 → approval → CLOSED with full audit/provenance.
 
 ## 10. Epic 6 — Productivity & MVP+ Intelligence
 
-### Objective
-Improve expert productivity after the core closed loop is stable.
+Only after the closed loop is stable:
+- advanced Context Drawer;
+- copy feature groups between TSSS;
+- historical comparable picker;
+- advanced keyboard/grid operations;
+- advanced GCN reconciliation;
+- parcel/location suggestions;
+- deeper VBDLIS support;
+- AI semantic similarity/explanation;
+- approval/prediction analytics where useful.
 
-### Candidate capabilities
-- Advanced Context Drawer.
-- Copy comparable feature groups.
-- Historical comparable picker.
-- Keyboard/grid productivity.
-- Advanced GCN reconciliation.
-- Parcel/location assistance.
-- Advanced VBDLIS integration.
-- AI semantic similarity and explanations.
-- Approval analytics.
+This epic must not delay the core MVP loop.
 
-### Rule
-This Epic must not delay the core MVP closed loop.
+## 11. Epic 7 — Pilot Hardening / Release Candidate
 
-## 11. Epic 7 — Pilot Hardening & Release Candidate
+No major feature expansion.
 
-### Objective
-Turn the feature-complete MVP into a releasable Windows product without major feature expansion.
+Focus:
+- SQLCipher-class production binding/distribution;
+- document-vault crypto implementation;
+- protected secrets/provider retention policy;
+- backup/recovery;
+- installer/update signing;
+- crash/autosave/migration recovery;
+- corrupted DB/workbook handling;
+- performance with realistic case/TSSS/CTXD/history volumes;
+- real-user pilot acceptance;
+- production installer/update behavior.
 
-### Security / operations
-- Final SQLCipher-class binding and packaging.
-- Document/evidence encryption implementation.
-- Windows user-scoped protected key handling.
-- Provider secret/retention policy.
-- Encrypted backup and recovery design.
-- Installer/update signing.
+## 12. Mandatory Excel Qualification Gate
 
-### Reliability
-- Autosave and crash recovery.
-- Database migration/rollback discipline.
-- Corrupt DB/workbook handling.
-- Source artifact hashing and provenance consistency.
-- Structured error handling and log redaction.
+Pipeline:
 
-### Performance
-Validate representative loads for many cases, TSSS, CTXD, historical corpora, workbook generation and document batches.
+`Canonical Case → CenValue Engine → ExcelTemplateProfile → Generated Workbook → Microsoft Excel Desktop full recalculation → checkpoint readback → tolerance comparison → PASS/BLOCK`
 
-### Pilot UX
-Run real-user workflows from create case through approval/close with appraisal staff.
-
-### Exit gate
-Pilot acceptance criteria pass; no release-critical defects remain.
-
-## 12. Excel Qualification — Mandatory Release Gate
-
-### Role
-Excel remains the Phase 1 approval/output compatibility contract and migration oracle; CenValue canonical calculation is the source of truth.
-
-### Qualification pipeline
-`Canonical Case Snapshot → TemplateProfile validation → fill mapped inputs → sanitize known external-link exceptions → preserve formulas/layout → Microsoft Excel Desktop full recalculation → read checkpoints → compare with CenValue Engine → PASS/BLOCK`.
-
-### PASS requires
-- matching fingerprint;
+PASS requires:
+- matching supported template fingerprint;
 - complete required mappings;
 - no unknown external dependency;
-- successful canonical calculation;
-- real Excel Desktop recalculation/verification when required;
-- all required checkpoints within frozen tolerance.
+- canonical calculation success;
+- real Excel Desktop recalculation evidence where qualification is required;
+- all mandatory checkpoints within frozen tolerance.
 
-No Excel Desktop recalculation evidence means qualification may be pending, but must not be reported as PASS.
+No real Excel evidence means qualification must not be reported PASS.
 
 ## 13. Release 1.0 Definition of Done
 
-A Windows user can:
+A user can:
+- launch the Windows desktop product;
+- create/resume multiple cases;
+- enter TSTĐ manually or through GCN-assisted staging/review;
+- resolve location;
+- manage multiple CTXD;
+- enter TSSS in practical quick/expanded workflows;
+- use historical suggestions while retaining human adjustment authority;
+- calculate comparable quality and valuation deterministically;
+- choose rounding policy;
+- export compatible approval Excel;
+- import returned approval workbook;
+- handle revisions;
+- approve/close the case with full provenance;
+- retain structured data ready for later knowledge-base/GĐ2 work.
 
-`Launch → Create/Resume Case → Manual or GCN-assisted TSTĐ → Location → Multiple CTXD → TSSS → Market Normalization → Historical Suggestion → Human Adjustment → Comparable Quality → Valuation Result → Rounding → Excel Export → Approval Return → Diff/Human Confirmation → Revision if required → APPROVED → CLOSED`.
+## 14. Deferred beyond Release 1.0
 
-Release 1.0 additionally requires:
-- encrypted local persistence;
-- auditable provenance;
-- human approval boundary;
-- stable autosave/resume;
-- Excel compatibility qualification PASS;
-- pilot hardening and installer readiness.
-
-## 14. Explicitly deferred beyond Release 1.0
-
-The following are not release blockers for Phase 1:
+Not blockers for GĐ1:
 - enterprise property/TSSS warehouse;
 - advanced GIS intelligence;
-- autonomous workflow automation;
-- CRM/revenue dashboards;
-- mobile/web clients;
+- workflow automation/pattern memory;
+- CRM/revenue dashboard;
+- mobile/web product;
 - multi-user collaboration;
 - internal OCR server;
 - full Company Adjustment Rule Engine runtime.
 
-Phase 1 must preserve forward-compatible structured data so these capabilities can be added later without destructive redesign.
+GĐ1 must remain forward-compatible with these directions without implementing them prematurely.
 
-## 15. Governance
+## 15. Governing principles
 
-- One Epic/PR scope at a time.
-- Evidence before acceptance.
-- Independent review where required.
-- No self-declared PASS for gated work.
-- Corrective loops address specific findings without reopening frozen discovery/design unless a blocker proves the frozen contract invalid.
-- GitHub stores reviewable engineering source-of-truth; Library retains reference/sample binary corpus and working artifacts that are intentionally excluded from Git.
+- Current Project Owner decision overrides older historical notes.
+- Do not reopen frozen Gate A/B decisions without new evidence.
+- Every implementation slice requires explicit acceptance evidence.
+- Domain logic remains independent of UI/framework/database/Excel/provider APIs.
+- External intelligence adapts into canonical contracts; it never defines them.
+- Deterministic calculation and Excel compatibility precede AI sophistication.
+- Human-in-the-loop remains mandatory for adjustment/final appraisal/approval decisions.
+- Core appraisal must remain usable when online providers fail.
+- GitHub/VPS publication/deployment remains subject to explicit Project Owner direction.
