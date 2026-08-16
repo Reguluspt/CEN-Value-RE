@@ -1,0 +1,233 @@
+name: E0-PR-002 findings corrective verification
+
+on:
+  push:
+    branches:
+      - agent/e0-pr-002-astryx
+    paths:
+      - .github/workflows/e0-pr-002-findings-verify.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/e0-pr-002-astryx
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.0'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Capture exact corrective input head
+        run: echo "TESTED_HEAD=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Capture implementation baseline lint
+        run: |
+          set -euo pipefail
+          git worktree add --detach /tmp/e0-pr-002-base 94ff266a3686b5b5bfd98cb55459dbe7a6cf24d8
+          cd /tmp/e0-pr-002-base/web
+          npm ci
+          npx eslint . -f json > /tmp/base-eslint-v3.json || true
+
+      - name: Install corrective branch dependencies
+        run: |
+          set -euo pipefail
+          cd web
+          npm ci
+
+      - name: Static verifier and scoped lint
+        run: |
+          set -euo pipefail
+          cd web
+          npm run verify:re-astryx | tee /tmp/static-v3.log
+          npx eslint \
+            vite.config.js \
+            src/App.jsx \
+            src/re/ReShell.jsx \
+            scripts/verify-re-astryx-spike.mjs \
+            scripts/verify-re-astryx-built-css.mjs \
+            scripts/scope-re-astryx-css.mjs \
+            scripts/e0-pr-002-browser-smoke.mjs \
+            | tee /tmp/scoped-lint-v3.log
+
+      - name: Full lint non-regression
+        run: |
+          set -euo pipefail
+          cd web
+          npx eslint . -f json > /tmp/after-eslint-v3.json || true
+          python - <<'PY'
+          import json, os
+          root_current = os.getcwd()
+          root_base = '/tmp/e0-pr-002-base/web'
+          changed = {
+              'vite.config.js',
+              'src/App.jsx',
+              'src/re/ReShell.jsx',
+              'scripts/verify-re-astryx-spike.mjs',
+              'scripts/verify-re-astryx-built-css.mjs',
+              'scripts/scope-re-astryx-css.mjs',
+              'scripts/e0-pr-002-browser-smoke.mjs',
+          }
+
+          def load(path, root):
+              out = {}
+              for entry in json.load(open(path, encoding='utf-8')):
+                  rel = os.path.relpath(entry['filePath'], root).replace('\\\\', '/')
+                  msgs = []
+                  for m in entry.get('messages', []):
+                      msgs.append((m.get('severity'), m.get('ruleId'), m.get('message'), m.get('line'), m.get('column')))
+                  out[rel] = sorted(msgs, key=lambda x: tuple('' if v is None else str(v) for v in x))
+              return out
+
+          before = load('/tmp/base-eslint-v3.json', root_base)
+          after = load('/tmp/after-eslint-v3.json', root_current)
+          regressions = []
+          for path in sorted(set(before) | set(after)):
+              if path in changed:
+                  continue
+              if before.get(path, []) != after.get(path, []):
+                  regressions.append(path)
+
+          summary = {
+              'baseline_error_count': sum(1 for msgs in before.values() for m in msgs if m[0] == 2),
+              'after_error_count': sum(1 for msgs in after.values() for m in msgs if m[0] == 2),
+              'unchanged_file_regressions': regressions,
+          }
+          json.dump(summary, open('/tmp/lint-summary-v3.json', 'w'), indent=2)
+          print(json.dumps(summary, indent=2))
+          if regressions:
+              raise SystemExit('Full lint regression in unchanged files: ' + ', '.join(regressions))
+          PY
+
+      - name: Production build and emitted CSS verification
+        run: |
+          set -euo pipefail
+          cd web
+          npm run build | tee /tmp/build-v3.log
+          npm run verify:re-astryx-built | tee /tmp/built-css-v3.log
+
+      - name: Static negative-control root mutation must fail
+        run: |
+          set -euo pipefail
+          cd web
+          printf '.cenvalue-re-surface{}\n:root{--border-width:999px;--color-accent:rgb(1,2,3)}\n' > /tmp/e0-pr-002-root-leak.css
+          if node scripts/verify-re-astryx-built-css.mjs /tmp/e0-pr-002-root-leak.css > /tmp/static-negative-v3.log 2>&1; then
+            cat /tmp/static-negative-v3.log
+            echo 'ERROR: static verifier accepted the known root mutation'
+            exit 1
+          fi
+          cat /tmp/static-negative-v3.log
+          echo 'Static negative control PASSED: known :root mutation was rejected'
+
+      - name: Install isolated Playwright
+        run: |
+          set -euo pipefail
+          npm install --prefix /tmp/pw --no-save --package-lock=false playwright@1.54.2
+          /tmp/pw/node_modules/.bin/playwright install --with-deps chromium
+          cp web/scripts/e0-pr-002-browser-smoke.mjs /tmp/pw/smoke.mjs
+
+      - name: Browser negative-control root mutation must fail
+        run: |
+          set -euo pipefail
+          cd web
+          npm run dev -- --host 127.0.0.1 > /tmp/vite-v3.log 2>&1 &
+          VITE_PID=$!
+          trap 'kill $VITE_PID || true' EXIT
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:5173/ >/dev/null; then break; fi
+            sleep 1
+          done
+          cd /tmp/pw
+          if E0_PR_002_BASE_URL=http://127.0.0.1:5173 E0_PR_002_INJECT_ROOT_LEAK=1 node smoke.mjs > /tmp/browser-negative-v3.log 2>&1; then
+            cat /tmp/browser-negative-v3.log
+            echo 'ERROR: browser gate accepted the known root custom-property mutation'
+            exit 1
+          fi
+          cat /tmp/browser-negative-v3.log
+          echo 'Browser negative control PASSED: known root custom-property mutation was rejected'
+
+      - name: Browser authorization, light/dark root isolation, and CSS non-regression
+        run: |
+          set -euo pipefail
+          cd /tmp/pw
+          E0_PR_002_BASE_URL=http://127.0.0.1:5173 node smoke.mjs | tee /tmp/browser-v3.log
+
+      - name: Write corrective evidence v3
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          BASE=$(python -c "import json; print(json.load(open('/tmp/lint-summary-v3.json'))['baseline_error_count'])")
+          AFTER=$(python -c "import json; print(json.load(open('/tmp/lint-summary-v3.json'))['after_error_count'])")
+          cat > evidence/E0_PR_002_RUNTIME_EVIDENCE_v3.md <<EOF
+          # E0-PR-002 Runtime Evidence v3 — Independent Review Findings Corrective
+
+          **Date:** 2026-08-16  
+          **Repository:** \`Reguluspt/CEN-Value-RE\`  
+          **Implementation baseline:** \`94ff266a3686b5b5bfd98cb55459dbe7a6cf24d8\`  
+          **Corrective tested input head:** \`${TESTED_HEAD}\`  
+          **GitHub Actions run:** \`${GITHUB_RUN_ID}\`
+
+          ## Findings targeted
+          - \`E0-PR-002-F001\` HIGH — Astryx vendor CSS mutated document \`:root\` / \`html[data-theme]\`.
+          - \`E0-PR-002-F002\` MEDIUM — verifier/browser harness did not detect resolved/built root mutation.
+
+          ## Corrective result
+          - Node 22.13.0: PASS
+          - resolved vendor CSS negative-control globals detected before transform: PASS
+          - Vite pre-transform rewrites Astryx token globals to \`.cenvalue-re-surface\`: PASS
+          - Astryx root \`Theme\` provider/documentElement sync path removed from RE shell: PASS
+          - scoped E0-PR-002 lint: PASS
+          - full legacy lint non-regression: PASS ($BASE errors baseline; $AFTER after; 0 unchanged-file regressions)
+          - production build: PASS
+          - emitted ReShell CSS contains no \`:root\`, \`html[data-theme]\`, or global \`body\` selector: PASS
+          - static negative control with the known \`:root { --border-width; --color-accent }\` mutation: REJECTED as expected
+          - browser negative control with the same root custom-property mutation: REJECTED as expected
+          - unauthenticated \`/re\` -> \`/login\`: PASS
+          - guest \`/re\` -> \`/sobo\`: PASS
+          - admin \`/re\` render: PASS in light and dark environments
+          - two Astryx \`TextInput\` controls: PASS in light and dark environments
+          - documentElement attributes + all computed root CSS custom properties unchanged after client-side \`/re\` visit: PASS in light and dark environments
+          - representative \`/dashboard\` and \`/cases\` computed styles unchanged after \`/re\`: PASS in light and dark environments
+          - new browser page errors after \`/re\`: 0
+          - new browser console errors after \`/re\`: 0
+          - \`node_modules/\`: not version-controlled
+
+          ## Gate
+          Corrective implementation evidence only. Findings require independent reviewer closure; E0-PR-002 remains not self-accepted.
+          EOF
+          cp /tmp/static-v3.log evidence/E0-PR-002_static_verification_runtime_v3.log
+          cp /tmp/scoped-lint-v3.log evidence/E0-PR-002_scoped_lint_v3.log
+          cp /tmp/build-v3.log evidence/E0-PR-002_build_v3.log
+          cp /tmp/built-css-v3.log evidence/E0-PR-002_built_css_verification_v3.log
+          cp /tmp/static-negative-v3.log evidence/E0-PR-002_static_negative_control_v3.log
+          cp /tmp/browser-negative-v3.log evidence/E0-PR-002_browser_negative_control_v3.log
+          cp /tmp/browser-v3.log evidence/E0-PR-002_browser_smoke_v3.log
+          cp /tmp/lint-summary-v3.json evidence/E0-PR-002_lint_nonregression_v3.json
+
+      - name: Repository guards and commit evidence
+        run: |
+          set -euo pipefail
+          test -z "$(git ls-files 'web/node_modules/**')"
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add evidence/E0_PR_002_RUNTIME_EVIDENCE_v3.md \
+            evidence/E0-PR-002_static_verification_runtime_v3.log \
+            evidence/E0-PR-002_scoped_lint_v3.log \
+            evidence/E0-PR-002_build_v3.log \
+            evidence/E0-PR-002_built_css_verification_v3.log \
+            evidence/E0-PR-002_static_negative_control_v3.log \
+            evidence/E0-PR-002_browser_negative_control_v3.log \
+            evidence/E0-PR-002_browser_smoke_v3.log \
+            evidence/E0-PR-002_lint_nonregression_v3.json
+          git commit -m 'E0-PR-002: record findings corrective evidence v3'
+          git push origin HEAD:agent/e0-pr-002-astryx
