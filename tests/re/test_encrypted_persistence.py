@@ -160,6 +160,21 @@ def test_dpapi_wrap_unwrap_uses_noninteractive_current_user_flow(monkeypatch: py
     assert len(local_free_calls) == 3
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="requires Windows DPAPI")
+def test_windows_dpapi_real_round_trip_and_wrapped_key_file(tmp_path: Path) -> None:
+    protector = WindowsDPAPIKeyProtector()
+    plaintext = secrets.token_bytes(32)
+    protected = protector.protect(plaintext)
+    assert protected != plaintext
+    assert plaintext not in protected
+    assert protector.unprotect(protected) == plaintext
+
+    key_path = tmp_path / "cenvalue-re.masterkey"
+    master_key = load_or_create_master_key(key_path, protector)
+    assert master_key not in key_path.read_bytes()
+    assert load_or_create_master_key(key_path, protector) == master_key
+
+
 def test_plain_sqlite_binding_is_rejected(tmp_path: Path) -> None:
     with pytest.raises(SQLCipherSecurityError, match="not SQLCipher"):
         open_encrypted_connection(tmp_path / "must-not-be-plain.db", b"k" * 32, dbapi=sqlite3)
@@ -181,6 +196,9 @@ def test_sqlcipher_db_is_encrypted_at_rest_and_wrong_key_fails(tmp_path: Path) -
                 client_name="Sensitive Client",
             )
         )
+        wal_path = Path(str(persistence.paths.database) + "-wal")
+        assert wal_path.exists()
+        assert b"Sensitive Client" not in wal_path.read_bytes()
 
     raw = persistence.paths.database.read_bytes()
     assert raw[:16] != b"SQLite format 3\x00"
