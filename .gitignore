@@ -5,6 +5,9 @@
 # Generated implementation/archive bundles are kept in the project Library.
 *.zip
 
+# Generated RE vendor CSS is reproduced from exact pinned npm packages.
+web/src/re/generated/
+
 # Local/runtime artifacts
 __pycache__/
 *.pyc
