@@ -1,4 +1,4 @@
-# rerun after archive and DPAPI closure
+# binding target-platform run after real DPAPI and WAL qualification
 name: E0-PR-007 Encrypted Persistence verification
 
 on:
@@ -13,7 +13,10 @@ permissions:
 jobs:
   verify:
     if: github.actor != 'github-actions[bot]'
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v4
         with:
@@ -89,7 +92,11 @@ jobs:
           import tempfile
           from pathlib import Path
 
-          from src.re.adapters.persistence import EncryptedREPersistence, PersistencePaths
+          from src.re.adapters.persistence import (
+              EncryptedREPersistence,
+              PersistencePaths,
+              WindowsDPAPIKeyProtector,
+          )
           from src.re.adapters.persistence.sqlcipher import open_encrypted_connection
           from src.re.ports.persistence import CaseRecord
 
@@ -142,6 +149,12 @@ jobs:
                   client_name='Persistence Vector Sensitive Client',
               ))
               assert uow.cases.get('vector-case').client_name == 'Persistence Vector Sensitive Client'
+              wal_path = Path(str(persistence.paths.database) + '-wal')
+              wal_present = wal_path.exists()
+              wal_sensitive_plaintext_visible = (
+                  b'Persistence Vector Sensitive Client' in wal_path.read_bytes()
+                  if wal_present else True
+              )
 
           db_raw = persistence.paths.database.read_bytes()
           key_raw = persistence.paths.protected_master_key.read_bytes()
@@ -188,9 +201,20 @@ jobs:
           except ValueError:
               same_path_legacy_rejected = True
 
+          dpapi = WindowsDPAPIKeyProtector()
+          dpapi_plaintext = secrets.token_bytes(32)
+          dpapi_wrapped = dpapi.protect(dpapi_plaintext)
+          dpapi_real_round_trip = (
+              dpapi_wrapped != dpapi_plaintext
+              and dpapi_plaintext not in dpapi_wrapped
+              and dpapi.unprotect(dpapi_wrapped) == dpapi_plaintext
+          )
+
           assert schema_version == 1
           assert sqlcipher_version
           assert len(repositories) == 6
+          assert wal_present
+          assert not wal_sensitive_plaintext_visible
           assert not sqlite_plain_header
           assert not sensitive_plaintext_visible
           assert not master_key_visible
@@ -200,10 +224,14 @@ jobs:
           assert protected_key_reused
           assert legacy_hash_unchanged
           assert same_path_legacy_rejected
+          assert dpapi_real_round_trip
 
+          print('runner_platform=windows')
           print('database_name=' + persistence.paths.database.name)
           print('schema_version=' + str(schema_version))
           print('sqlcipher_version=' + str(sqlcipher_version))
+          print('wal_present=' + str(wal_present).lower())
+          print('wal_sensitive_plaintext_visible=' + str(wal_sensitive_plaintext_visible).lower())
           print('sqlite_plain_header=' + str(sqlite_plain_header).lower())
           print('sensitive_plaintext_visible=' + str(sensitive_plaintext_visible).lower())
           print('master_key_visible_in_wrapped_file=' + str(master_key_visible).lower())
@@ -215,6 +243,7 @@ jobs:
           print('legacy_hash_unchanged=' + str(legacy_hash_unchanged).lower())
           print('same_path_legacy_rejected=' + str(same_path_legacy_rejected).lower())
           print('dpapi_scope=CURRENT_USER')
+          print('dpapi_real_round_trip=' + str(dpapi_real_round_trip).lower())
           PY
       - name: Write evidence
         run: |
@@ -229,13 +258,14 @@ jobs:
           **Implementation baseline:** \`e57e492d59d0160e5f8721d35e8ed21867458f63\`
           **Tested HEAD:** \`${TESTED_HEAD}\`
           **GitHub Actions run:** \`${GITHUB_RUN_ID}\`
+          **Runner:** \`windows-latest\`
           **Python:** \`${PYTHON_RUNTIME}\`
           **Flask:** \`${FLASK_RUNTIME}\`
           **sqlcipher3 package:** \`${SQLCIPHER3_PACKAGE}\`
           **SQLCipher runtime:** \`${SQLCIPHER_RUNTIME}\`
 
           ## Verification
-          - persistence adapter/port compile: PASS
+          - Windows target-platform persistence adapter/port compile: PASS
           - bounded scope / git diff check: PASS
           - architecture/import regressions: PASS
           - E0-PR-003 Decimal/RoundingPolicy regressions: PASS
@@ -245,13 +275,14 @@ jobs:
           - E0-PR-007 encrypted-persistence tests: PASS
           - SQLCipher runtime verified through PRAGMA cipher_version: PASS
           - canonical database lacks plaintext SQLite header: PASS
-          - sensitive sample plaintext absent from raw DB bytes: PASS
+          - sensitive sample plaintext absent from main DB and live WAL bytes: PASS
           - standard sqlite3 cannot query canonical encrypted DB: PASS
           - wrong SQLCipher key rejected: PASS
           - standard sqlite3 binding rejected as SQLCipher fallback: PASS
           - random master key absent from wrapped-key file: PASS
           - protected key reused across reopen without regeneration: PASS
-          - Windows DPAPI ctypes wrap/unprotect call path + noninteractive current-user flags: PASS
+          - real Windows CryptProtectData/CryptUnprotectData round-trip: PASS
+          - DPAPI ctypes call path uses noninteractive current-user flags: PASS
           - schema migration version 1 applied and failed migration rolls back: PASS
           - six repository contracts round-trip exact decimal strings: PASS
           - six repository archive/soft-delete contracts: PASS
@@ -260,7 +291,7 @@ jobs:
           - DPAPI production scope frozen to CURRENT_USER: PASS
 
           ## Scope qualification
-          This proves the Epic 0 encrypted canonical RE database, migration and repository foundation. It does not implement document-vault encryption, backup/recovery, legacy import, appraisal APIs, valuation formulas, Excel runtime or UI features.
+          This proves the Epic 0 encrypted canonical RE database, migration and repository foundation on the Windows target platform. It does not implement document-vault encryption, backup/recovery, legacy import, appraisal APIs, valuation formulas, Excel runtime or UI features.
 
           ## Acceptance
           Implementation evidence only. E0-PR-007 remains pending independent review/acceptance.
@@ -273,5 +304,5 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add evidence/E0_PR_007_RUNTIME_EVIDENCE_v1.md evidence/E0-PR-007_tests_v1.log evidence/E0-PR-007_persistence_vectors_v1.log
-          git commit -m 'E0-PR-007: record runtime evidence v1'
+          git commit -m 'E0-PR-007: record Windows runtime evidence v1'
           git push origin HEAD:agent/e0-pr-007-encrypted-persistence
