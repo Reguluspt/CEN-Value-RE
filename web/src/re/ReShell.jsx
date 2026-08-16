@@ -4,6 +4,8 @@ import { FormLayout } from '@astryxdesign/core/FormLayout';
 import { SideNav, SideNavItem, SideNavSection } from '@astryxdesign/core/SideNav';
 import { Text } from '@astryxdesign/core/Text';
 import { TextInput } from '@astryxdesign/core/TextInput';
+import './generated/astryx-core.scoped.css';
+import './generated/neutral-theme.scoped.css';
 import './astryx.css';
 
 function ReShell() {
