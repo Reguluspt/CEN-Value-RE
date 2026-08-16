@@ -1,9 +1,13 @@
 /*
  * E0-PR-002 isolation rule:
- * Do NOT import @astryxdesign/core/reset.css here. Astryx's reset is global and
- * would alter legacy Ant Design / application surfaces after the /re chunk is
- * loaded. The spike loads only Astryx component CSS + Neutral theme CSS and
- * supplies a minimal reset scoped to the CenValue RE surface.
+ * - Do NOT import @astryxdesign/core/reset.css; it is intentionally global.
+ * - Astryx core/theme bundles are still required for component styling/tokens,
+ *   but Vite's cenvalue-re-astryx-css-containment pre-transform rewrites their
+ *   known :root and html[data-theme] token selectors onto .cenvalue-re-surface
+ *   before CSS is emitted.
+ * - ReShell does not mount Astryx's root Theme provider because v0.2.0 syncs
+ *   theme attributes to document.documentElement. Theme attributes live only
+ *   on .cenvalue-re-surface instead.
  */
 @import '@astryxdesign/core/astryx.css';
 @import '@astryxdesign/theme-neutral/theme.css';
