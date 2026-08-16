@@ -20,19 +20,25 @@ jobs:
         run: |
           set -euo pipefail
           cd web
-          for f in node_modules/@astryxdesign/core/components.css node_modules/@astryxdesign/theme-neutral/light.css; do
-            echo "=== $f ==="
-            node - "$f" <<'NODE'
+          node <<'NODE'
           const fs = require('fs');
           const postcss = require('postcss');
-          const file = process.argv[2];
-          const css = fs.readFileSync(file, 'utf8');
-          const root = postcss.parse(css, { from: file });
-          for (const rule of []) {}
-          root.walkRules(rule => {
-            if (/(^|[\s,>+~])(:root|html|body)(?=$|[\s,.#:[>+~])/.test(rule.selector)) {
-              console.log(rule.selector);
-            }
-          });
+          const exportsToInspect = [
+            '@astryxdesign/core/astryx.css',
+            '@astryxdesign/theme-neutral/theme.css',
+          ];
+          for (const specifier of exportsToInspect) {
+            const file = require.resolve(specifier);
+            console.log(`=== ${specifier} -> ${file} ===`);
+            const css = fs.readFileSync(file, 'utf8');
+            const root = postcss.parse(css, { from: file });
+            let count = 0;
+            root.walkRules(rule => {
+              if (/(^|[\s,>+~])(:root|html|body)(?=$|[\s,.#:[>+~])/.test(rule.selector)) {
+                console.log(rule.selector);
+                count += 1;
+              }
+            });
+            console.log(`GLOBAL_RULE_COUNT=${count}`);
+          }
           NODE
-          done
