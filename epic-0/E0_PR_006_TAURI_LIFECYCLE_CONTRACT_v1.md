@@ -1,6 +1,6 @@
 # E0-PR-006 — Tauri / Local-Service Lifecycle Contract v1
 
-**Status:** IMPLEMENTATION CONTRACT  
+**Status:** IMPLEMENTATION CONTRACT
 **Baseline:** `f53d2f2b500e8a70a2e1a4b76bc7a699c7820c88`
 
 ## Boundary
