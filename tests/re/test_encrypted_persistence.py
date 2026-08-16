@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ctypes
 import hashlib
 import secrets
 import sqlite3
@@ -18,6 +19,7 @@ from src.re.adapters.persistence import (
     SQLCipherSecurityError,
     WindowsDPAPIKeyProtector,
 )
+from src.re.adapters.persistence import key_protection as key_protection_module
 from src.re.adapters.persistence import migrations as migration_module
 from src.re.adapters.persistence.key_protection import load_or_create_master_key
 from src.re.adapters.persistence.migrations import Migration, apply_migrations
@@ -90,6 +92,72 @@ def test_dpapi_baseline_is_current_user_scope() -> None:
     if sys.platform != "win32":
         with pytest.raises(KeyProtectionError, match="only on Windows"):
             WindowsDPAPIKeyProtector()
+
+
+def test_dpapi_wrap_unwrap_uses_noninteractive_current_user_flow(monkeypatch: pytest.MonkeyPatch) -> None:
+    buffers: list[object] = []
+    flags: list[int] = []
+    local_free_calls: list[object] = []
+
+    class FakeFunction:
+        def __init__(self, implementation):
+            self.implementation = implementation
+            self.argtypes = None
+            self.restype = None
+
+        def __call__(self, *args):
+            return self.implementation(*args)
+
+    def write_blob(output_arg, value: bytes) -> None:
+        buffer = ctypes.create_string_buffer(value, len(value))
+        buffers.append(buffer)
+        output = output_arg._obj
+        output.cbData = len(value)
+        output.pbData = ctypes.cast(buffer, ctypes.POINTER(ctypes.c_ubyte))
+
+    def protect(input_arg, description, entropy, reserved, prompt, dw_flags, output_arg):
+        del description, entropy, reserved, prompt
+        flags.append(dw_flags)
+        source = input_arg._obj
+        plaintext = ctypes.string_at(source.pbData, source.cbData)
+        write_blob(output_arg, b"wrapped:" + plaintext)
+        return 1
+
+    def unprotect(input_arg, description_arg, entropy, reserved, prompt, dw_flags, output_arg):
+        del entropy, reserved, prompt
+        flags.append(dw_flags)
+        source = input_arg._obj
+        protected = ctypes.string_at(source.pbData, source.cbData)
+        assert protected.startswith(b"wrapped:")
+        write_blob(output_arg, protected[len(b"wrapped:") :])
+        description_arg._obj.value = "CenValue RE master key"
+        return 1
+
+    def local_free(pointer):
+        local_free_calls.append(pointer)
+        return None
+
+    crypt32 = type("FakeCrypt32", (), {})()
+    crypt32.CryptProtectData = FakeFunction(protect)
+    crypt32.CryptUnprotectData = FakeFunction(unprotect)
+    kernel32 = type("FakeKernel32", (), {})()
+    kernel32.LocalFree = FakeFunction(local_free)
+
+    monkeypatch.setattr(key_protection_module.sys, "platform", "win32")
+    monkeypatch.setattr(
+        key_protection_module.ctypes,
+        "WinDLL",
+        lambda name, use_last_error=True: crypt32 if name == "crypt32" else kernel32,
+        raising=False,
+    )
+
+    protector = WindowsDPAPIKeyProtector()
+    plaintext = b"k" * 32
+    protected = protector.protect(plaintext)
+    assert protected != plaintext
+    assert protector.unprotect(protected) == plaintext
+    assert flags == [key_protection_module.CRYPTPROTECT_UI_FORBIDDEN] * 2
+    assert len(local_free_calls) == 3
 
 
 def test_plain_sqlite_binding_is_rejected(tmp_path: Path) -> None:
@@ -217,8 +285,19 @@ def test_all_six_repository_contracts_round_trip_exact_strings(tmp_path: Path) -
         assert uow.adjustment_decisions.get(adjustment.id) == adjustment
         assert uow.approval_submissions.get(approval.id) == approval
 
-        uow.cases.archive(case.id, "2026-08-16T02:00:00Z")
-        assert uow.cases.get(case.id).archived_at == "2026-08-16T02:00:00Z"
+        archived_at = "2026-08-16T02:00:00Z"
+        uow.cases.archive(case.id, archived_at)
+        uow.subjects.archive(subject.property_id, archived_at)
+        uow.comparables.archive(comparable.property_id, archived_at)
+        uow.construction_assets.archive(asset.id, archived_at)
+        uow.adjustment_decisions.archive(adjustment.id, archived_at)
+        uow.approval_submissions.archive(approval.id, archived_at)
+        assert uow.cases.get(case.id).archived_at == archived_at
+        assert uow.subjects.get(subject.property_id).archived_at == archived_at
+        assert uow.comparables.get(comparable.property_id).archived_at == archived_at
+        assert uow.construction_assets.get(asset.id).archived_at == archived_at
+        assert uow.adjustment_decisions.get(adjustment.id).archived_at == archived_at
+        assert uow.approval_submissions.get(approval.id).archived_at == archived_at
 
 
 def test_legacy_cases_database_is_untouched(tmp_path: Path) -> None:

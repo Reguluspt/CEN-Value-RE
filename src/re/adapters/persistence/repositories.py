@@ -105,6 +105,12 @@ class SQLCipherSubjectPropertyRepository:
         ).fetchone()
         return SubjectPropertyRecord(**row) if row else None
 
+    def archive(self, property_id: str, archived_at: str) -> None:
+        _commit(
+            self._connection,
+            (("UPDATE property SET archived_at=?, updated_at=? WHERE id=? AND role='SUBJECT'", (archived_at, archived_at, property_id)),),
+        )
+
 
 class SQLCipherComparablePropertyRepository:
     def __init__(self, connection) -> None:
@@ -157,6 +163,12 @@ class SQLCipherComparablePropertyRepository:
         ).fetchone()
         return ComparablePropertyRecord(**row) if row else None
 
+    def archive(self, property_id: str, archived_at: str) -> None:
+        _commit(
+            self._connection,
+            (("UPDATE property SET archived_at=?, updated_at=? WHERE id=? AND role='COMPARABLE'", (archived_at, archived_at, property_id)),),
+        )
+
 
 class SQLCipherConstructionAssetRepository:
     def __init__(self, connection) -> None:
@@ -175,6 +187,12 @@ class SQLCipherConstructionAssetRepository:
     def get(self, record_id: str) -> ConstructionAssetRecord | None:
         row = self._connection.execute("SELECT * FROM construction_asset WHERE id=?", (record_id,)).fetchone()
         return ConstructionAssetRecord(**row) if row else None
+
+    def archive(self, record_id: str, archived_at: str) -> None:
+        _commit(
+            self._connection,
+            (("UPDATE construction_asset SET archived_at=?, updated_at=? WHERE id=?", (archived_at, archived_at, record_id)),),
+        )
 
 
 class SQLCipherAdjustmentDecisionRepository:
@@ -199,6 +217,12 @@ class SQLCipherAdjustmentDecisionRepository:
         row["selected_explicitly"] = _bool(row["selected_explicitly"])
         return AdjustmentDecisionRecord(**row)
 
+    def archive(self, record_id: str, archived_at: str) -> None:
+        _commit(
+            self._connection,
+            (("UPDATE adjustment_decision SET archived_at=? WHERE id=?", (archived_at, record_id)),),
+        )
+
 
 class SQLCipherApprovalSubmissionRepository:
     def __init__(self, connection) -> None:
@@ -217,3 +241,9 @@ class SQLCipherApprovalSubmissionRepository:
     def get(self, record_id: str) -> ApprovalSubmissionRecord | None:
         row = self._connection.execute("SELECT * FROM approval_submission WHERE id=?", (record_id,)).fetchone()
         return ApprovalSubmissionRecord(**row) if row else None
+
+    def archive(self, record_id: str, archived_at: str) -> None:
+        _commit(
+            self._connection,
+            (("UPDATE approval_submission SET archived_at=? WHERE id=?", (archived_at, record_id)),),
+        )

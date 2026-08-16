@@ -90,7 +90,7 @@ class WindowsDPAPIKeyProtector:
         try:
             return ctypes.string_at(output_blob.pbData, output_blob.cbData)
         finally:
-            self._kernel32.LocalFree(output_blob.pbData)
+            self._kernel32.LocalFree(ctypes.cast(output_blob.pbData, ctypes.c_void_p))
 
     def unprotect(self, protected: bytes) -> bytes:
         if not protected:
@@ -113,9 +113,9 @@ class WindowsDPAPIKeyProtector:
         try:
             return ctypes.string_at(output_blob.pbData, output_blob.cbData)
         finally:
-            self._kernel32.LocalFree(output_blob.pbData)
+            self._kernel32.LocalFree(ctypes.cast(output_blob.pbData, ctypes.c_void_p))
             if description:
-                self._kernel32.LocalFree(description)
+                self._kernel32.LocalFree(ctypes.cast(description, ctypes.c_void_p))
 
 
 def load_or_create_master_key(path: Path, protector: KeyProtector) -> bytes:
