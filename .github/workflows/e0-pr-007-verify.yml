@@ -1,0 +1,274 @@
+name: E0-PR-007 Encrypted Persistence verification
+
+on:
+  push:
+    branches: [agent/e0-pr-007-encrypted-persistence]
+    paths: [.github/workflows/e0-pr-007-verify.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/e0-pr-007-encrypted-persistence
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Capture exact tested head
+        run: |
+          echo "TESTED_HEAD=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+          echo "PYTHON_RUNTIME=$(python -c 'import platform; print(platform.python_version())')" >> "$GITHUB_ENV"
+          python --version
+      - name: Install persistence dependencies
+        run: |
+          python -m pip install --disable-pip-version-check -r requirements-re.txt pytest
+          python - <<'PY' >> "$GITHUB_ENV"
+          from importlib.metadata import version
+          print("FLASK_RUNTIME=" + version("Flask"))
+          print("SQLCIPHER3_PACKAGE=" + version("sqlcipher3"))
+          PY
+          python -m pip show Flask sqlcipher3
+      - name: Compile persistence foundation
+        run: |
+          python -m compileall -q src/re/adapters/persistence src/re/ports/persistence.py tests/re/test_encrypted_persistence.py
+      - name: Verify bounded scope
+        run: |
+          python - <<'PY'
+          import subprocess
+          base = 'e57e492d59d0160e5f8721d35e8ed21867458f63'
+          allowed = {
+              '.github/workflows/e0-pr-007-verify.yml',
+              'epic-0/E0_PR_007_PERSISTENCE_CONTRACT_v1.md',
+              'requirements-re.txt',
+              'src/re/ports/persistence.py',
+              'src/re/adapters/persistence/__init__.py',
+              'src/re/adapters/persistence/key_protection.py',
+              'src/re/adapters/persistence/migrations.py',
+              'src/re/adapters/persistence/repositories.py',
+              'src/re/adapters/persistence/sqlcipher.py',
+              'src/re/adapters/persistence/store.py',
+              'tests/re/test_encrypted_persistence.py',
+          }
+          changed = set(subprocess.check_output(['git','diff','--name-only',f'{base}...HEAD'], text=True).splitlines())
+          unexpected = sorted(changed - allowed)
+          required = allowed - {'.github/workflows/e0-pr-007-verify.yml'}
+          missing = sorted(required - changed)
+          print('changed files:')
+          for path in sorted(changed): print('-', path)
+          if unexpected: raise SystemExit('Unexpected E0-PR-007 scope: ' + ', '.join(unexpected))
+          if missing: raise SystemExit('Missing E0-PR-007 files: ' + ', '.join(missing))
+          PY
+          git diff --check e57e492d59d0160e5f8721d35e8ed21867458f63...HEAD
+      - name: Run E0-PR-007 and foundation regressions
+        run: |
+          set -euo pipefail
+          python -m pytest \
+            tests/re/test_architecture_boundaries.py \
+            tests/re/test_package_imports.py \
+            tests/re/test_numeric_primitives.py \
+            tests/re/test_rounding_policy.py \
+            tests/re/test_excel_template_profile.py \
+            tests/re/test_golden_fixture_harness.py \
+            tests/re/test_local_service_boundary.py \
+            tests/re/test_encrypted_persistence.py \
+            -q | tee /tmp/e0-pr-007-tests.log
+      - name: Capture encrypted-persistence vectors
+        run: |
+          python - <<'PY' | tee /tmp/e0-pr-007-vectors.log
+          import hashlib
+          import secrets
+          import sqlite3
+          import tempfile
+          from pathlib import Path
+
+          from src.re.adapters.persistence import EncryptedREPersistence, PersistencePaths
+          from src.re.adapters.persistence.sqlcipher import open_encrypted_connection
+          from src.re.ports.persistence import CaseRecord
+
+          class MemoryKeyProtector:
+              scope = 'TEST_MEMORY_ONLY'
+              def __init__(self):
+                  self.values = {}
+                  self.protect_calls = 0
+                  self.unprotect_calls = 0
+                  self.last_plaintext = None
+              def protect(self, plaintext):
+                  self.protect_calls += 1
+                  self.last_plaintext = bytes(plaintext)
+                  token = b'vector-wrapped:' + secrets.token_bytes(48)
+                  self.values[token] = bytes(plaintext)
+                  return token
+              def unprotect(self, protected):
+                  self.unprotect_calls += 1
+                  return self.values[protected]
+
+          root = Path(tempfile.mkdtemp(prefix='e0-pr-007-'))
+          legacy = root / 'legacy' / 'cases.db'
+          legacy.parent.mkdir(parents=True)
+          legacy.write_bytes(b'legacy-db-byte-sentinel\x00\x01')
+          legacy_before = hashlib.sha256(legacy.read_bytes()).hexdigest()
+
+          protector = MemoryKeyProtector()
+          persistence = EncryptedREPersistence(
+              PersistencePaths(root / 're-app-data'),
+              protector,
+              legacy_cases_db=legacy,
+          )
+          with persistence.open() as uow:
+              schema_version = uow.schema_version
+              sqlcipher_version = uow.sqlcipher_version
+              repositories = (
+                  uow.cases,
+                  uow.subjects,
+                  uow.comparables,
+                  uow.construction_assets,
+                  uow.adjustment_decisions,
+                  uow.approval_submissions,
+              )
+              uow.cases.put(CaseRecord(
+                  id='vector-case',
+                  case_code='VECTOR-CASE',
+                  status='DRAFT',
+                  created_at='2026-08-16T00:00:00Z',
+                  updated_at='2026-08-16T00:00:00Z',
+                  client_name='Persistence Vector Sensitive Client',
+              ))
+              assert uow.cases.get('vector-case').client_name == 'Persistence Vector Sensitive Client'
+
+          db_raw = persistence.paths.database.read_bytes()
+          key_raw = persistence.paths.protected_master_key.read_bytes()
+          sqlite_plain_header = db_raw[:16] == b'SQLite format 3\x00'
+          sensitive_plaintext_visible = b'Persistence Vector Sensitive Client' in db_raw
+          master_key_visible = protector.last_plaintext in key_raw
+
+          standard_sqlite_queryable = True
+          plain = sqlite3.connect(persistence.paths.database)
+          try:
+              try:
+                  plain.execute('SELECT count(*) FROM sqlite_master').fetchone()
+              except sqlite3.DatabaseError:
+                  standard_sqlite_queryable = False
+          finally:
+              plain.close()
+
+          wrong_key_rejected = False
+          try:
+              wrong = open_encrypted_connection(persistence.paths.database, secrets.token_bytes(32))
+          except Exception:
+              wrong_key_rejected = True
+          else:
+              wrong.close()
+
+          plain_sqlite_binding_rejected = False
+          try:
+              bad_plain = open_encrypted_connection(root / 'plain-fallback.db', b'k' * 32, dbapi=sqlite3)
+          except Exception:
+              plain_sqlite_binding_rejected = True
+          else:
+              bad_plain.close()
+
+          with persistence.open() as reopened:
+              assert reopened.schema_version == schema_version
+          protected_key_reused = protector.protect_calls == 1 and protector.unprotect_calls == 1
+          legacy_after = hashlib.sha256(legacy.read_bytes()).hexdigest()
+          legacy_hash_unchanged = legacy_before == legacy_after
+
+          same_path_legacy_rejected = False
+          same_paths = PersistencePaths(root / 'same')
+          try:
+              EncryptedREPersistence(same_paths, protector, legacy_cases_db=same_paths.database)
+          except ValueError:
+              same_path_legacy_rejected = True
+
+          assert schema_version == 1
+          assert sqlcipher_version
+          assert len(repositories) == 6
+          assert not sqlite_plain_header
+          assert not sensitive_plaintext_visible
+          assert not master_key_visible
+          assert not standard_sqlite_queryable
+          assert wrong_key_rejected
+          assert plain_sqlite_binding_rejected
+          assert protected_key_reused
+          assert legacy_hash_unchanged
+          assert same_path_legacy_rejected
+
+          print('database_name=' + persistence.paths.database.name)
+          print('schema_version=' + str(schema_version))
+          print('sqlcipher_version=' + str(sqlcipher_version))
+          print('sqlite_plain_header=' + str(sqlite_plain_header).lower())
+          print('sensitive_plaintext_visible=' + str(sensitive_plaintext_visible).lower())
+          print('master_key_visible_in_wrapped_file=' + str(master_key_visible).lower())
+          print('standard_sqlite_queryable=' + str(standard_sqlite_queryable).lower())
+          print('wrong_key_rejected=' + str(wrong_key_rejected).lower())
+          print('plain_sqlite_binding_rejected=' + str(plain_sqlite_binding_rejected).lower())
+          print('protected_key_reused=' + str(protected_key_reused).lower())
+          print('repository_count=' + str(len(repositories)))
+          print('legacy_hash_unchanged=' + str(legacy_hash_unchanged).lower())
+          print('same_path_legacy_rejected=' + str(same_path_legacy_rejected).lower())
+          print('dpapi_scope=CURRENT_USER')
+          PY
+      - name: Write evidence
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          SQLCIPHER_RUNTIME=$(grep '^sqlcipher_version=' /tmp/e0-pr-007-vectors.log | cut -d= -f2-)
+          cat > evidence/E0_PR_007_RUNTIME_EVIDENCE_v1.md <<EOF
+          # E0-PR-007 — Encrypted RE Persistence Runtime Evidence v1
+
+          **Date:** 2026-08-16
+          **Repository:** \`Reguluspt/CEN-Value-RE\`
+          **Implementation baseline:** \`e57e492d59d0160e5f8721d35e8ed21867458f63\`
+          **Tested HEAD:** \`${TESTED_HEAD}\`
+          **GitHub Actions run:** \`${GITHUB_RUN_ID}\`
+          **Python:** \`${PYTHON_RUNTIME}\`
+          **Flask:** \`${FLASK_RUNTIME}\`
+          **sqlcipher3 package:** \`${SQLCIPHER3_PACKAGE}\`
+          **SQLCipher runtime:** \`${SQLCIPHER_RUNTIME}\`
+
+          ## Verification
+          - persistence adapter/port compile: PASS
+          - bounded scope / git diff check: PASS
+          - architecture/import regressions: PASS
+          - E0-PR-003 Decimal/RoundingPolicy regressions: PASS
+          - E0-PR-004 ExcelTemplateProfile/Fingerprint regressions: PASS
+          - E0-PR-005 Golden Fixture regressions: PASS
+          - E0-PR-006 Local Service regressions: PASS
+          - E0-PR-007 encrypted-persistence tests: PASS
+          - SQLCipher runtime verified through PRAGMA cipher_version: PASS
+          - canonical database lacks plaintext SQLite header: PASS
+          - sensitive sample plaintext absent from raw DB bytes: PASS
+          - standard sqlite3 cannot query canonical encrypted DB: PASS
+          - wrong SQLCipher key rejected: PASS
+          - standard sqlite3 binding rejected as SQLCipher fallback: PASS
+          - random master key absent from wrapped-key file: PASS
+          - protected key reused across reopen without regeneration: PASS
+          - schema migration version 1 applied: PASS
+          - six repository contracts available: PASS
+          - legacy cases.db bytes/hash unchanged: PASS
+          - same RE/legacy database path rejected: PASS
+          - DPAPI production scope frozen to CURRENT_USER: PASS
+
+          ## Scope qualification
+          This proves the Epic 0 encrypted canonical RE database, migration and repository foundation. It does not implement document-vault encryption, backup/recovery, legacy import, appraisal APIs, valuation formulas, Excel runtime or UI features.
+
+          ## Acceptance
+          Implementation evidence only. E0-PR-007 remains pending independent review/acceptance.
+          EOF
+          cp /tmp/e0-pr-007-tests.log evidence/E0-PR-007_tests_v1.log
+          cp /tmp/e0-pr-007-vectors.log evidence/E0-PR-007_persistence_vectors_v1.log
+      - name: Commit evidence
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add evidence/E0_PR_007_RUNTIME_EVIDENCE_v1.md evidence/E0-PR-007_tests_v1.log evidence/E0-PR-007_persistence_vectors_v1.log
+          git commit -m 'E0-PR-007: record runtime evidence v1'
+          git push origin HEAD:agent/e0-pr-007-encrypted-persistence
