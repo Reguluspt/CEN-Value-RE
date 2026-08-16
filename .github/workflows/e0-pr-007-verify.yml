@@ -1,3 +1,4 @@
+# rerun after archive and DPAPI closure
 name: E0-PR-007 Encrypted Persistence verification
 
 on:
@@ -250,8 +251,10 @@ jobs:
           - standard sqlite3 binding rejected as SQLCipher fallback: PASS
           - random master key absent from wrapped-key file: PASS
           - protected key reused across reopen without regeneration: PASS
-          - schema migration version 1 applied: PASS
-          - six repository contracts available: PASS
+          - Windows DPAPI ctypes wrap/unprotect call path + noninteractive current-user flags: PASS
+          - schema migration version 1 applied and failed migration rolls back: PASS
+          - six repository contracts round-trip exact decimal strings: PASS
+          - six repository archive/soft-delete contracts: PASS
           - legacy cases.db bytes/hash unchanged: PASS
           - same RE/legacy database path rejected: PASS
           - DPAPI production scope frozen to CURRENT_USER: PASS
