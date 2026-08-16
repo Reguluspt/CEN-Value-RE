@@ -1,0 +1,233 @@
+name: E0-PR-006 Local Service Boundary verification
+
+on:
+  push:
+    branches: [agent/e0-pr-006-local-service]
+    paths: [.github/workflows/e0-pr-006-verify.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/e0-pr-006-local-service
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Capture exact tested head
+        run: |
+          echo "TESTED_HEAD=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+          echo "PYTHON_RUNTIME=$(python -c 'import platform; print(platform.python_version())')" >> "$GITHUB_ENV"
+          python --version
+      - name: Install local-service dependencies
+        run: |
+          python -m pip install --disable-pip-version-check -r requirements-re.txt pytest
+          echo "FLASK_RUNTIME=$(python -c \"from importlib.metadata import version; print(version('Flask'))\")" >> "$GITHUB_ENV"
+          python -m pip show Flask
+      - name: Compile local-service adapter
+        run: python -m compileall -q src/re/adapters/local_service
+      - name: Verify bounded scope
+        run: |
+          python - <<'PY'
+          import subprocess
+          base = 'f53d2f2b500e8a70a2e1a4b76bc7a699c7820c88'
+          allowed = {
+              '.github/workflows/e0-pr-006-verify.yml',
+              'epic-0/E0_PR_006_TAURI_LIFECYCLE_CONTRACT_v1.md',
+              'requirements-re.txt',
+              'src/re/adapters/local_service/__init__.py',
+              'src/re/adapters/local_service/bootstrap.py',
+              'src/re/adapters/local_service/flask_app.py',
+              'src/re/adapters/local_service/runtime.py',
+              'tests/re/test_local_service_boundary.py',
+          }
+          changed = set(subprocess.check_output(['git','diff','--name-only',f'{base}...HEAD'], text=True).splitlines())
+          unexpected = sorted(changed - allowed)
+          required = allowed - {'.github/workflows/e0-pr-006-verify.yml'}
+          missing = sorted(required - changed)
+          print('changed files:')
+          for path in sorted(changed): print('-', path)
+          if unexpected: raise SystemExit('Unexpected E0-PR-006 scope: ' + ', '.join(unexpected))
+          if missing: raise SystemExit('Missing E0-PR-006 files: ' + ', '.join(missing))
+          PY
+          git diff --check f53d2f2b500e8a70a2e1a4b76bc7a699c7820c88...HEAD
+      - name: Run E0-PR-006 and foundation regressions
+        run: |
+          set -euo pipefail
+          python -m pytest \
+            tests/re/test_architecture_boundaries.py \
+            tests/re/test_package_imports.py \
+            tests/re/test_numeric_primitives.py \
+            tests/re/test_rounding_policy.py \
+            tests/re/test_excel_template_profile.py \
+            tests/re/test_golden_fixture_harness.py \
+            tests/re/test_local_service_boundary.py \
+            -q | tee /tmp/e0-pr-006-tests.log
+      - name: Capture local-service security vectors
+        run: |
+          python - <<'PY' | tee /tmp/e0-pr-006-vectors.log
+          import socket
+          from urllib.error import HTTPError
+          from urllib.parse import urlsplit
+          from urllib.request import Request, urlopen
+
+          from src.re.adapters.local_service import (
+              AUTHORIZATION_HEADER,
+              LAUNCH_ID_HEADER,
+              LaunchSession,
+              LocalServiceConfig,
+              LocalServiceRuntime,
+              SessionDecision,
+              create_local_service_app,
+          )
+
+          bad_hosts = ('0.0.0.0', '::', '192.168.1.10', '10.0.0.5', '8.8.8.8', 'localhost')
+          rejected = []
+          for host in bad_hosts:
+              try:
+                  LocalServiceConfig(host=host)
+              except ValueError:
+                  rejected.append(host)
+          assert rejected == list(bad_hosts)
+
+          current_session, current = LaunchSession.issue()
+          _, old = LaunchSession.issue()
+          assert current.launch_id != old.launch_id
+          assert current.bearer_token != old.bearer_token
+          assert current_session.authorize(launch_id=old.launch_id, bearer_token=old.bearer_token) is SessionDecision.STALE
+          assert current.bearer_token not in repr(current)
+
+          app = create_local_service_app(current_session)
+          client = app.test_client()
+          missing = client.get('/api/re/health/session')
+          stale = client.get('/api/re/health/session', headers={
+              LAUNCH_ID_HEADER: old.launch_id,
+              AUTHORIZATION_HEADER: f'Bearer {old.bearer_token}',
+          })
+          invalid = client.get('/api/re/health/session', headers={
+              LAUNCH_ID_HEADER: current.launch_id,
+              AUTHORIZATION_HEADER: 'Bearer invalid-token',
+          })
+          lan = client.get('/api/re/health/live', environ_base={'REMOTE_ADDR':'192.168.1.50'})
+          rules = {rule.rule for rule in app.url_map.iter_rules()}
+          assert missing.status_code == stale.status_code == invalid.status_code == 401
+          assert missing.get_json()['error']['code'] == 'RE_SESSION_REQUIRED'
+          assert stale.get_json()['error']['code'] == 'RE_SESSION_STALE'
+          assert invalid.get_json()['error']['code'] == 'RE_SESSION_INVALID'
+          assert lan.status_code == 403
+          assert lan.get_json()['error']['code'] == 'RE_LOOPBACK_REQUIRED'
+          assert '/api/re/bootstrap' not in rules
+          assert '/api/re/shutdown' not in rules
+
+          runtime = LocalServiceRuntime(LocalServiceConfig(host='127.0.0.1', port=0))
+          bootstrap = runtime.start()
+          parsed = urlsplit(bootstrap.base_url)
+          port = parsed.port
+          assert parsed.hostname == '127.0.0.1'
+          assert port and port != 0
+          assert bootstrap.bearer_token not in repr(bootstrap)
+          assert 'bearer_token' not in bootstrap.public_metadata()
+          try:
+              with urlopen(bootstrap.base_url + '/api/re/health/live', timeout=3) as response:
+                  live_status = response.status
+              request = Request(
+                  bootstrap.base_url + '/api/re/health/session',
+                  headers={
+                      LAUNCH_ID_HEADER: bootstrap.launch_id,
+                      AUTHORIZATION_HEADER: f'Bearer {bootstrap.bearer_token}',
+                  },
+              )
+              with urlopen(request, timeout=3) as response:
+                  protected_status = response.status
+              try:
+                  urlopen(bootstrap.base_url + '/api/re/health/session', timeout=3)
+              except HTTPError as exc:
+                  live_missing_status = exc.code
+              else:
+                  raise AssertionError('missing credential unexpectedly accepted')
+          finally:
+              runtime.shutdown()
+
+          listener_closed = False
+          try:
+              socket.create_connection(('127.0.0.1', port), timeout=1).close()
+          except OSError:
+              listener_closed = True
+          assert listener_closed
+
+          print('bind_host=127.0.0.1')
+          print('configured_port=0')
+          print('actual_port_ephemeral=' + str(port != 0).lower())
+          print('non_loopback_bind_rejected=true')
+          print('launch_credentials_unique=true')
+          print('secret_repr_redacted=true')
+          print('http_bootstrap_route_present=false')
+          print('http_shutdown_route_present=false')
+          print('missing_session_code=' + missing.get_json()['error']['code'])
+          print('stale_session_code=' + stale.get_json()['error']['code'])
+          print('invalid_session_code=' + invalid.get_json()['error']['code'])
+          print('lan_remote_code=' + lan.get_json()['error']['code'])
+          print('live_health_status=' + str(live_status))
+          print('protected_health_status=' + str(protected_status))
+          print('live_missing_session_status=' + str(live_missing_status))
+          print('shutdown_state=' + runtime.state.value)
+          print('listener_closed=' + str(listener_closed).lower())
+          PY
+      - name: Write evidence
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          cat > evidence/E0_PR_006_RUNTIME_EVIDENCE_v1.md <<EOF
+          # E0-PR-006 — Local Service Boundary Runtime Evidence v1
+
+          **Date:** 2026-08-16
+          **Repository:** \`Reguluspt/CEN-Value-RE\`
+          **Implementation baseline:** \`f53d2f2b500e8a70a2e1a4b76bc7a699c7820c88\`
+          **Tested HEAD:** \`${TESTED_HEAD}\`
+          **GitHub Actions run:** \`${GITHUB_RUN_ID}\`
+          **Python:** \`${PYTHON_RUNTIME}\`
+          **Flask:** \`${FLASK_RUNTIME}\`
+
+          ## Verification
+          - local-service adapter compile: PASS
+          - bounded scope / git diff check: PASS
+          - architecture/import regressions: PASS
+          - E0-PR-003 Decimal/RoundingPolicy regressions: PASS
+          - E0-PR-004 ExcelTemplateProfile/Fingerprint regressions: PASS
+          - E0-PR-005 Golden Fixture regressions: PASS
+          - E0-PR-006 local-service tests: PASS
+          - wildcard/LAN/public bind targets rejected: PASS
+          - live listener bound to numeric loopback with OS-assigned port: PASS
+          - per-launch credentials unique and secret-redacted: PASS
+          - no HTTP bootstrap credential endpoint: PASS
+          - unauthenticated protected health rejected: PASS
+          - stale launch rejected: PASS
+          - invalid bearer rejected: PASS
+          - non-loopback remote request rejected: PASS
+          - protected health accepts current launch credential: PASS
+          - shutdown closes listener and runtime is not restartable: PASS
+          - structured security errors contain code/message only: PASS
+
+          ## Scope qualification
+          This proves the Epic 0 local application-service security/lifecycle boundary. It does not implement persistence, appraisal APIs, business formulas, Tauri packaging/IPC transport, or public-web deployment.
+
+          ## Acceptance
+          Implementation evidence only. E0-PR-006 remains pending independent review/acceptance.
+          EOF
+          cp /tmp/e0-pr-006-tests.log evidence/E0-PR-006_tests_v1.log
+          cp /tmp/e0-pr-006-vectors.log evidence/E0-PR-006_local_service_vectors_v1.log
+      - name: Commit evidence
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add evidence/E0_PR_006_RUNTIME_EVIDENCE_v1.md evidence/E0-PR-006_tests_v1.log evidence/E0-PR-006_local_service_vectors_v1.log
+          git commit -m 'E0-PR-006: record runtime evidence v1'
+          git push origin HEAD:agent/e0-pr-006-local-service
