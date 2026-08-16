@@ -3,40 +3,61 @@
 **Source workspace:** ChatGPT Library `/CEN Value RE`  
 **Target repository:** `Reguluspt/CEN-Value-RE`  
 **Import branch:** `agent/initial-project-import`  
-**Mode:** Draft PR / review-first import
+**Mode:** Ready-for-review repository baseline import
 
-## Repository scope
+## R0 acceptance snapshot — 2026-08-16
 
-The normalized Library snapshot contains 100 project files after duplicate removal. Project Owner has approved a GitHub scope that intentionally excludes reference/sample and packaged binary artifacts:
+The Library snapshot used for R0 acceptance contained **103 files**.
 
-- `*.pdf` — sample GCN/reference documents;
-- `*.xlsx` — sample Excel workbook used for reverse-engineering and qualification;
-- `*.zip` — generated/packaged implementation archives whose reviewable patch/report/evidence remains version-controlled.
+Project Owner-approved GitHub policy intentionally excludes **15 Library-only artifacts**:
+- 10 sample/reference PDFs;
+- 1 sample Excel workbook (`*.xlsx`);
+- 3 packaged implementation archives (`*.zip`);
+- `BRAINSTORM Full.md` provenance-only archive.
 
-Those assets remain in the canonical project Library and are not required for the GitHub baseline.
+Therefore the canonical reviewable/version-controlled import target was **88 files**.
 
-## Version-controlled content
+All 88 target files were materialized from current Library versions and SHA-256 checked. An older staging copy contained 9 stale documents; those copies were replaced from the Library and the final comparison reached **88/88 matches, 0 mismatches**.
 
-GitHub contains the reviewable/source-of-truth artifacts needed to continue engineering work, including:
+## GitHub integrity
 
+Canonical baseline import commit:
+`6135e039bf918461cae386e9953af54bb1168619`
+
+Before generating the R0 acceptance artifact, PR #1 showed exactly **88 changed files**, matching the approved reviewable target.
+
+Forbidden repository artifacts found:
+- `*.pdf`: 0
+- `*.xlsx`: 0
+- `*.zip`: 0
+- `BRAINSTORM Full.md`: 0
+
+Critical stale-risk files and the two largest text artifacts were additionally verified against their expected Git blob SHA.
+
+See `reports/R0_REPOSITORY_BASELINE_ACCEPTANCE_v1.md` for full evidence.
+
+## Repository source-of-truth scope
+
+GitHub contains reviewable engineering artifacts required to continue development:
 - Design Book;
 - Gate A / Gate B contracts and evidence;
 - Epic 0 packets;
-- corrective register and acceptance evidence;
+- corrective and acceptance evidence;
 - canonical fixtures and mapping data;
 - implementation patches and reports;
-- text logs, hash manifests, and engineering reports.
+- text logs and engineering/hash reports;
+- approved Master Product Roadmap.
+
+Reference/sample binaries remain in the project Library.
 
 ## Current project stage
 
+- Master Product Roadmap v1: **APPROVED**.
 - Gate B: **FROZEN / CLOSED**.
-- E0-PR-001: **ACCEPTED** after independent review.
-- E0-PR-002: implementation/static verification prepared; runtime build/browser acceptance evidence remains pending.
-
-## Integrity rule
-
-No excluded binary is replaced by a placeholder or transformed copy. If a binary artifact later becomes necessary for a release, reproducible test, or source-of-truth requirement, it must be introduced deliberately with an explicit repository policy change.
+- E0-PR-001: **ACCEPTED**.
+- E0-PR-002: implementation/static verification prepared; runtime build/browser acceptance evidence pending.
+- R0 import content gate: **PASS / ACCEPTED FOR REVIEW**.
 
 ## Merge rule
 
-The first import may be merged when the intended version-controlled file set is present, the PR diff is reviewed, and no unintended binary artifacts are included.
+PR #1 may be reviewed as the initial repository baseline. Do not treat R0 as merged/closed until the PR receives the required review/owner decision and is merged into `main`.
