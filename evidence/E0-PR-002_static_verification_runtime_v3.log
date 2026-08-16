@@ -1,0 +1,19 @@
+
+> web@0.0.0 verify:re-astryx
+> npm run prepare:re-astryx-css && node scripts/verify-re-astryx-spike.mjs
+
+
+> web@0.0.0 prepare:re-astryx-css
+> node scripts/generate-re-astryx-css.mjs
+
+E0-PR-002 scoped Astryx CSS generated
+- src/re/generated/astryx-core.scoped.css
+- src/re/generated/neutral-theme.scoped.css
+E0-PR-002 static verification PASSED
+- exact Astryx dependency pins present
+- /re route is protected, lazy-loaded, and outside legacy Layout
+- AppShell + SideNav + FormLayout + TextInput present
+- RE shell has no root Astryx Theme provider/documentElement sync path
+- local RE CSS contains no vendor import or global :root/html[data-theme]/body rule
+- generated vendor CSS deterministically rewrites Astryx globals to .cenvalue-re-surface
+- known raw vendor :root/html[data-theme] mutation is retained as a negative control and eliminated before Vite sees the CSS

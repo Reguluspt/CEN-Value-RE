@@ -1,0 +1,10 @@
+E0-PR-002 browser smoke PASSED
+- unauthenticated /re redirected to /login
+- guest /re redirected to /sobo
+- /re rendered as mocked admin in light and dark environments
+- two Astryx TextInput controls rendered in both environments
+- documentElement attributes and every computed root custom property unchanged after client-side /re visit
+- /dashboard and /cases representative computed styles unchanged in light and dark environments
+- legacy console error baselines: light=5, dark=5 unique message(s)
+- new browser page errors after /re: 0
+- new browser console errors after /re: 0
