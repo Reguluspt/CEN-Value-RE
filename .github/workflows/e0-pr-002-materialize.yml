@@ -151,7 +151,7 @@ jobs:
             sleep 1
           done
 
-          cat > /tmp/e0-pr-002-smoke.mjs <<'JS'
+          cat > .e0-pr-002-smoke.mjs <<'JS'
           import { chromium } from 'playwright';
           import assert from 'node:assert/strict';
 
@@ -185,14 +185,25 @@ jobs:
             await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
           });
 
-          async function goto(path, text) {
-            await page.goto(`http://127.0.0.1:5173${path}`, { waitUntil: 'networkidle' });
+          async function waitForText(text) {
             await page.getByText(text, { exact: false }).first().waitFor({ state: 'visible' });
             await page.waitForTimeout(250);
           }
 
-          async function styleSnapshot(path, text, selector) {
-            await goto(path, text);
+          async function firstGoto(path, text) {
+            await page.goto(`http://127.0.0.1:5173${path}`, { waitUntil: 'networkidle' });
+            await waitForText(text);
+          }
+
+          async function spaGoto(path, text) {
+            await page.evaluate((nextPath) => {
+              window.history.pushState({}, '', nextPath);
+              window.dispatchEvent(new PopStateEvent('popstate'));
+            }, path);
+            await waitForText(text);
+          }
+
+          async function currentStyleSnapshot(selector) {
             return page.evaluate((sel) => {
               const body = getComputedStyle(document.body);
               const el = document.querySelector(sel);
@@ -210,28 +221,36 @@ jobs:
             }, selector);
           }
 
-          const dashboardBefore = await styleSnapshot('/dashboard', 'Dashboard', 'h1');
-          const casesBefore = await styleSnapshot('/cases', 'Quản lý hồ sơ', '.ant-card');
+          await firstGoto('/dashboard', 'Dashboard');
+          const dashboardBefore = await currentStyleSnapshot('h1');
 
-          await goto('/re', 'CenValue RE — Astryx integration spike');
+          await spaGoto('/cases', 'Quản lý hồ sơ');
+          const casesBefore = await currentStyleSnapshot('.ant-card');
+
+          await spaGoto('/re', 'CenValue RE — Astryx integration spike');
           await page.locator('[data-re-astryx-spike="v1"]').waitFor({ state: 'visible' });
           assert.equal(await page.locator('[data-re-astryx-spike="v1"] input').count(), 2);
 
-          const dashboardAfter = await styleSnapshot('/dashboard', 'Dashboard', 'h1');
-          const casesAfter = await styleSnapshot('/cases', 'Quản lý hồ sơ', '.ant-card');
-          assert.deepEqual(dashboardAfter, dashboardBefore, 'Dashboard computed styles changed after visiting /re');
-          assert.deepEqual(casesAfter, casesBefore, 'Cases computed styles changed after visiting /re');
+          await spaGoto('/dashboard', 'Dashboard');
+          const dashboardAfter = await currentStyleSnapshot('h1');
+          await spaGoto('/cases', 'Quản lý hồ sơ');
+          const casesAfter = await currentStyleSnapshot('.ant-card');
+
+          assert.deepEqual(dashboardAfter, dashboardBefore, 'Dashboard computed styles changed after client-side visit to /re');
+          assert.deepEqual(casesAfter, casesBefore, 'Cases computed styles changed after client-side visit to /re');
           assert.deepEqual(pageErrors, [], 'Browser page errors: ' + pageErrors.join(' | '));
 
           console.log('E0-PR-002 browser smoke PASSED');
           console.log('- /re rendered as mocked admin');
           console.log('- two Astryx TextInput controls rendered');
-          console.log('- /dashboard computed styles unchanged after /re');
-          console.log('- /cases computed styles unchanged after /re');
+          console.log('- /dashboard computed styles unchanged after client-side /re visit');
+          console.log('- /cases computed styles unchanged after client-side /re visit');
+          console.log('- browser page errors: 0');
           await browser.close();
           JS
 
-          node /tmp/e0-pr-002-smoke.mjs | tee /tmp/astryx-browser-smoke.log
+          node ./.e0-pr-002-smoke.mjs | tee /tmp/astryx-browser-smoke.log
+          rm -f .e0-pr-002-smoke.mjs
           cd ..
 
       - name: Write E0-PR-002 execution evidence
@@ -265,8 +284,8 @@ jobs:
           - browser smoke: PASS
             - \`/re\` renders as admin
             - Astryx AppShell/SideNav/FormLayout/TextInput surface renders
-            - \`/dashboard\` computed styles unchanged after visiting \`/re\`
-            - \`/cases\` computed styles unchanged after visiting \`/re\`
+            - \`/dashboard\` computed styles unchanged after client-side visit to \`/re\`
+            - \`/cases\` computed styles unchanged after client-side visit to \`/re\`
             - browser page errors: 0
 
           ## Acceptance note
