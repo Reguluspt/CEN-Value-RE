@@ -4,11 +4,12 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
+    "prepare:re-astryx-css": "node scripts/generate-re-astryx-css.mjs",
+    "dev": "npm run prepare:re-astryx-css && vite",
+    "build": "npm run prepare:re-astryx-css && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "verify:re-astryx": "node scripts/verify-re-astryx-spike.mjs",
+    "verify:re-astryx": "npm run prepare:re-astryx-css && node scripts/verify-re-astryx-spike.mjs",
     "verify:re-astryx-built": "node scripts/verify-re-astryx-built-css.mjs"
   },
   "dependencies": {
