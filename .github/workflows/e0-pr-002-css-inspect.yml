@@ -1,0 +1,38 @@
+name: E0-PR-002 Astryx CSS inspect
+on:
+  push:
+    branches: [agent/e0-pr-002-astryx]
+    paths: [.github/workflows/e0-pr-002-css-inspect.yml]
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.0'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: cd web && npm ci
+      - name: Inspect Astryx CSS globals
+        run: |
+          set -euo pipefail
+          cd web
+          for f in node_modules/@astryxdesign/core/components.css node_modules/@astryxdesign/theme-neutral/light.css; do
+            echo "=== $f ==="
+            node - "$f" <<'NODE'
+          const fs = require('fs');
+          const postcss = require('postcss');
+          const file = process.argv[2];
+          const css = fs.readFileSync(file, 'utf8');
+          const root = postcss.parse(css, { from: file });
+          for (const rule of []) {}
+          root.walkRules(rule => {
+            if (/(^|[\s,>+~])(:root|html|body)(?=$|[\s,.#:[>+~])/.test(rule.selector)) {
+              console.log(rule.selector);
+            }
+          });
+          NODE
+          done
