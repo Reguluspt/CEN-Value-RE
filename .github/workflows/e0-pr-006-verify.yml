@@ -1,4 +1,4 @@
-# rerun after lifecycle diff-hygiene fix
+# rerun after all-health authentication tightening
 name: E0-PR-006 Local Service Boundary verification
 
 on:
@@ -110,7 +110,8 @@ jobs:
 
           app = create_local_service_app(current_session)
           client = app.test_client()
-          missing = client.get('/api/re/health/session')
+          missing_live = client.get('/api/re/health/live')
+          missing_session = client.get('/api/re/health/session')
           stale = client.get('/api/re/health/session', headers={
               LAUNCH_ID_HEADER: old.launch_id,
               AUTHORIZATION_HEADER: f'Bearer {old.bearer_token}',
@@ -119,10 +120,15 @@ jobs:
               LAUNCH_ID_HEADER: current.launch_id,
               AUTHORIZATION_HEADER: 'Bearer invalid-token',
           })
-          lan = client.get('/api/re/health/live', environ_base={'REMOTE_ADDR':'192.168.1.50'})
+          lan = client.get('/api/re/health/live', headers={
+              LAUNCH_ID_HEADER: current.launch_id,
+              AUTHORIZATION_HEADER: f'Bearer {current.bearer_token}',
+          }, environ_base={'REMOTE_ADDR':'192.168.1.50'})
           rules = {rule.rule for rule in app.url_map.iter_rules()}
-          assert missing.status_code == stale.status_code == invalid.status_code == 401
-          assert missing.get_json()['error']['code'] == 'RE_SESSION_REQUIRED'
+          assert missing_live.status_code == missing_session.status_code == 401
+          assert stale.status_code == invalid.status_code == 401
+          assert missing_live.get_json()['error']['code'] == 'RE_SESSION_REQUIRED'
+          assert missing_session.get_json()['error']['code'] == 'RE_SESSION_REQUIRED'
           assert stale.get_json()['error']['code'] == 'RE_SESSION_STALE'
           assert invalid.get_json()['error']['code'] == 'RE_SESSION_INVALID'
           assert lan.status_code == 403
@@ -139,23 +145,36 @@ jobs:
           assert bootstrap.bearer_token not in repr(bootstrap)
           assert 'bearer_token' not in bootstrap.public_metadata()
           try:
-              with urlopen(bootstrap.base_url + '/api/re/health/live', timeout=3) as response:
+              try:
+                  urlopen(bootstrap.base_url + '/api/re/health/live', timeout=3)
+              except HTTPError as exc:
+                  live_missing_status = exc.code
+              else:
+                  raise AssertionError('anonymous liveness unexpectedly accepted')
+              live_request = Request(
+                  bootstrap.base_url + '/api/re/health/live',
+                  headers={
+                      LAUNCH_ID_HEADER: bootstrap.launch_id,
+                      AUTHORIZATION_HEADER: f'Bearer {bootstrap.bearer_token}',
+                  },
+              )
+              with urlopen(live_request, timeout=3) as response:
                   live_status = response.status
-              request = Request(
+              protected_request = Request(
                   bootstrap.base_url + '/api/re/health/session',
                   headers={
                       LAUNCH_ID_HEADER: bootstrap.launch_id,
                       AUTHORIZATION_HEADER: f'Bearer {bootstrap.bearer_token}',
                   },
               )
-              with urlopen(request, timeout=3) as response:
+              with urlopen(protected_request, timeout=3) as response:
                   protected_status = response.status
               try:
                   urlopen(bootstrap.base_url + '/api/re/health/session', timeout=3)
               except HTTPError as exc:
-                  live_missing_status = exc.code
+                  session_missing_status = exc.code
               else:
-                  raise AssertionError('missing credential unexpectedly accepted')
+                  raise AssertionError('missing session credential unexpectedly accepted')
           finally:
               runtime.shutdown()
 
@@ -174,13 +193,14 @@ jobs:
           print('secret_repr_redacted=true')
           print('http_bootstrap_route_present=false')
           print('http_shutdown_route_present=false')
-          print('missing_session_code=' + missing.get_json()['error']['code'])
+          print('anonymous_live_status=' + str(live_missing_status))
+          print('anonymous_session_status=' + str(session_missing_status))
+          print('missing_session_code=' + missing_session.get_json()['error']['code'])
           print('stale_session_code=' + stale.get_json()['error']['code'])
           print('invalid_session_code=' + invalid.get_json()['error']['code'])
           print('lan_remote_code=' + lan.get_json()['error']['code'])
           print('live_health_status=' + str(live_status))
           print('protected_health_status=' + str(protected_status))
-          print('live_missing_session_status=' + str(live_missing_status))
           print('shutdown_state=' + runtime.state.value)
           print('listener_closed=' + str(listener_closed).lower())
           PY
@@ -211,11 +231,11 @@ jobs:
           - live listener bound to numeric loopback with OS-assigned port: PASS
           - per-launch credentials unique and secret-redacted: PASS
           - no HTTP bootstrap credential endpoint: PASS
-          - unauthenticated protected health rejected: PASS
+          - all RE health routes reject unauthenticated requests: PASS
           - stale launch rejected: PASS
           - invalid bearer rejected: PASS
           - non-loopback remote request rejected: PASS
-          - protected health accepts current launch credential: PASS
+          - health routes accept current launch credential: PASS
           - shutdown closes listener and runtime is not restartable: PASS
           - structured security errors contain code/message only: PASS
 
