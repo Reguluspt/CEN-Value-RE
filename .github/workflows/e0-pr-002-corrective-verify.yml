@@ -1,0 +1,181 @@
+name: E0-PR-002 corrective verification
+
+on:
+  push:
+    branches:
+      - agent/e0-pr-002-astryx
+    paths:
+      - .github/workflows/e0-pr-002-corrective-verify.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/e0-pr-002-astryx
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.0'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Capture exact input head
+        run: echo "TESTED_HEAD=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Capture implementation baseline lint
+        run: |
+          set -euo pipefail
+          git worktree add --detach /tmp/e0-pr-002-base 94ff266a3686b5b5bfd98cb55459dbe7a6cf24d8
+          cd /tmp/e0-pr-002-base/web
+          npm ci
+          npx eslint . -f json > /tmp/base-eslint-v2.json || true
+
+      - name: Install current branch dependencies
+        run: |
+          set -euo pipefail
+          cd web
+          npm ci
+
+      - name: Static verifier and scoped lint
+        run: |
+          set -euo pipefail
+          cd web
+          npm run verify:re-astryx | tee /tmp/static-v2.log
+          npx eslint src/App.jsx src/re/ReShell.jsx scripts/verify-re-astryx-spike.mjs scripts/e0-pr-002-browser-smoke.mjs | tee /tmp/scoped-lint-v2.log
+
+      - name: Full lint non-regression
+        run: |
+          set -euo pipefail
+          cd web
+          npx eslint . -f json > /tmp/after-eslint-v2.json || true
+          python - <<'PY'
+          import json, os
+          root_current = os.getcwd()
+          root_base = '/tmp/e0-pr-002-base/web'
+          changed = {
+              'src/App.jsx',
+              'src/re/ReShell.jsx',
+              'scripts/verify-re-astryx-spike.mjs',
+              'scripts/e0-pr-002-browser-smoke.mjs',
+          }
+
+          def load(path, root):
+              out = {}
+              for entry in json.load(open(path, encoding='utf-8')):
+                  rel = os.path.relpath(entry['filePath'], root).replace('\\\\', '/')
+                  msgs = []
+                  for m in entry.get('messages', []):
+                      msgs.append((m.get('severity'), m.get('ruleId'), m.get('message'), m.get('line'), m.get('column')))
+                  out[rel] = sorted(msgs, key=lambda x: tuple('' if v is None else str(v) for v in x))
+              return out
+
+          before = load('/tmp/base-eslint-v2.json', root_base)
+          after = load('/tmp/after-eslint-v2.json', root_current)
+          regressions = []
+          for path in sorted(set(before) | set(after)):
+              if path in changed:
+                  continue
+              if before.get(path, []) != after.get(path, []):
+                  regressions.append(path)
+
+          summary = {
+              'baseline_error_count': sum(1 for msgs in before.values() for m in msgs if m[0] == 2),
+              'after_error_count': sum(1 for msgs in after.values() for m in msgs if m[0] == 2),
+              'unchanged_file_regressions': regressions,
+          }
+          json.dump(summary, open('/tmp/lint-summary-v2.json', 'w'), indent=2)
+          print(json.dumps(summary, indent=2))
+          if regressions:
+              raise SystemExit('Full lint regression in unchanged files: ' + ', '.join(regressions))
+          PY
+
+      - name: Production build
+        run: |
+          set -euo pipefail
+          cd web
+          npm run build | tee /tmp/build-v2.log
+
+      - name: Browser authorization smoke and CSS isolation
+        run: |
+          set -euo pipefail
+          npm install --prefix /tmp/pw --no-save --package-lock=false playwright@1.54.2
+          /tmp/pw/node_modules/.bin/playwright install --with-deps chromium
+          cp web/scripts/e0-pr-002-browser-smoke.mjs /tmp/pw/smoke.mjs
+
+          cd web
+          npm run dev -- --host 127.0.0.1 > /tmp/vite-v2.log 2>&1 &
+          VITE_PID=$!
+          trap 'kill $VITE_PID || true' EXIT
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:5173/ >/dev/null; then break; fi
+            sleep 1
+          done
+          cd /tmp/pw
+          if ! E0_PR_002_BASE_URL=http://127.0.0.1:5173 node smoke.mjs | tee /tmp/browser-v2.log; then
+            echo '--- VITE LOG ---'
+            cat /tmp/vite-v2.log
+            exit 1
+          fi
+
+      - name: Write corrective evidence v2
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          BASE=$(python -c "import json; print(json.load(open('/tmp/lint-summary-v2.json'))['baseline_error_count'])")
+          AFTER=$(python -c "import json; print(json.load(open('/tmp/lint-summary-v2.json'))['after_error_count'])")
+          cat > evidence/E0_PR_002_RUNTIME_EVIDENCE_v2.md <<EOF
+          # E0-PR-002 Runtime Evidence v2
+
+          **Date:** 2026-08-16  
+          **Repository:** \`Reguluspt/CEN-Value-RE\`  
+          **Implementation baseline:** \`94ff266a3686b5b5bfd98cb55459dbe7a6cf24d8\`  
+          **Tested input head:** \`${TESTED_HEAD}\`  
+          **GitHub Actions run:** \`${GITHUB_RUN_ID}\`
+
+          ## Result
+          - Node 22.13.0: PASS
+          - static verifier: PASS
+          - scoped E0-PR-002 lint: PASS
+          - full legacy lint non-regression: PASS ($BASE errors baseline; $AFTER after; 0 unchanged-file regressions)
+          - production build: PASS
+          - unauthenticated \`/re\` redirect to \`/login\`: PASS
+          - guest \`/re\` redirect to \`/sobo\`: PASS
+          - admin \`/re\` render: PASS
+          - two Astryx \`TextInput\` controls: PASS
+          - client-side CSS isolation for \`/dashboard\` and \`/cases\`: PASS
+          - browser page errors: 0
+          - browser console errors: 0
+          - \`node_modules/\`: not version-controlled
+
+          ## Acceptance
+          Corrective implementation evidence only. E0-PR-002 remains pending independent acceptance.
+          EOF
+          cp /tmp/static-v2.log evidence/E0-PR-002_static_verification_runtime_v2.log
+          cp /tmp/scoped-lint-v2.log evidence/E0-PR-002_scoped_lint_v2.log
+          cp /tmp/build-v2.log evidence/E0-PR-002_build_v2.log
+          cp /tmp/browser-v2.log evidence/E0-PR-002_browser_smoke_v2.log
+          cp /tmp/lint-summary-v2.json evidence/E0-PR-002_lint_nonregression_v2.json
+
+      - name: Repository guards and commit evidence
+        run: |
+          set -euo pipefail
+          test -z "$(git ls-files 'web/node_modules/**')"
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add evidence/E0_PR_002_RUNTIME_EVIDENCE_v2.md \
+            evidence/E0-PR-002_static_verification_runtime_v2.log \
+            evidence/E0-PR-002_scoped_lint_v2.log \
+            evidence/E0-PR-002_build_v2.log \
+            evidence/E0-PR-002_browser_smoke_v2.log \
+            evidence/E0-PR-002_lint_nonregression_v2.json
+          git commit -m 'E0-PR-002: record corrective runtime evidence v2'
+          git push origin HEAD:agent/e0-pr-002-astryx
