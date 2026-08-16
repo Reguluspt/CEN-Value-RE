@@ -1,26 +1,34 @@
 # E0-PR-002 — Astryx Integration Spike — Implementation Report v1
 
 **Date:** 2026-08-16  
-**Status:** SERVER PAYLOAD PREPARED; STATIC GUARD GREEN; RUNTIME BUILD/RENDER EVIDENCE PENDING  
-**Repository baseline inspected:** `Reguluspt/New-project` `main` at `cc6ad5fcc15703ae31fd9f2e8ee78c972f06d2ff`  
-**Publish status:** NOT PUBLISHED
+**Status:** IMPLEMENTED; STATIC/RUNTIME EVIDENCE GREEN; INDEPENDENT ACCEPTANCE PENDING  
+**Repository of record:** `Reguluspt/CEN-Value-RE`  
+**Implementation baseline:** `94ff266a3686b5b5bfd98cb55459dbe7a6cf24d8`  
+**Legacy frontend provenance:** `Reguluspt/New-project@cc6ad5fcc15703ae31fd9f2e8ee78c972f06d2ff` (read-only reference imported by R1)  
+**Publish status:** FEATURE BRANCH ONLY; NOT MERGED / NOT DEPLOYED
 
 ## Scope
-This payload implements only the Epic 0 Astryx integration spike:
+This implementation covers only the Epic 0 Astryx integration spike:
 - isolated `/re` frontend surface;
 - exact Astryx v0.2.0 package pins + StyleX peer pin;
 - Astryx `AppShell`, `SideNav`, `FormLayout`, `TextInput`, Neutral theme;
 - CSS collision containment against the legacy Ant Design/global CSS surface;
-- static architectural verifier for the spike.
+- static architectural verifier;
+- reusable browser smoke/CSS-isolation harness;
+- version-controlled `package-lock.json` updated by npm on a GitHub-hosted runner.
 
 No appraisal/domain formula, persistence, Excel runtime, API service, OCR/provider, or production business workflow is introduced.
 
-## Changed files
+## Changed implementation files
 - `web/package.json`
+- `web/package-lock.json`
 - `web/src/App.jsx`
 - `web/src/re/ReShell.jsx` (new)
 - `web/src/re/astryx.css` (new)
 - `web/scripts/verify-re-astryx-spike.mjs` (new)
+- `web/scripts/e0-pr-002-browser-smoke.mjs` (new)
+
+Evidence files are stored under `evidence/`.
 
 ## Isolation strategy
 - `/re` is protected by the existing `ProtectedRoute adminOnly` boundary.
@@ -28,6 +36,7 @@ No appraisal/domain formula, persistence, Excel runtime, API service, OCR/provid
 - the RE shell imports only React, Astryx packages, and its local scoped stylesheet.
 - `@astryxdesign/core/reset.css` is deliberately NOT imported because the Astryx reset is global and could alter legacy UI after the route chunk is loaded.
 - a minimal compatibility reset is scoped to `.cenvalue-re-surface`.
+- browser non-regression testing navigates client-side from legacy routes to `/re` and back, ensuring the lazy-loaded Astryx stylesheet remains present while legacy computed styles are compared.
 
 ## Dependency pins
 - `@astryxdesign/core`: `0.2.0`
@@ -36,33 +45,29 @@ No appraisal/domain formula, persistence, Excel runtime, API service, OCR/provid
 
 Pins are exact because Astryx is pre-1.0 and this spike must be reproducible.
 
-## Static verification
-Command:
-`cd web && npm run verify:re-astryx`
+`node_modules/` is runtime-only and is not version-controlled. `web/package-lock.json` is version-controlled.
 
-Equivalent direct command used on the server payload:
-`node scripts/verify-re-astryx-spike.mjs`
+## Runtime verification
+Executed on GitHub Actions using Node `22.13.0` against the CEN-Value-RE implementation baseline.
 
-Observed result: **PASSED**.
+Results:
+- exact Astryx dependency install / lockfile update: **PASS**;
+- `npm run verify:re-astryx`: **PASS**;
+- scoped ESLint for E0-PR-002 JavaScript: **PASS**;
+- full legacy lint non-regression: **PASS** (`88` inherited errors before, `88` after, `0` unchanged-file regressions);
+- `npm run build`: **PASS**;
+- `/re` browser smoke as mocked admin: **PASS**;
+- two Astryx `TextInput` controls rendered: **PASS**;
+- `/dashboard` computed styles unchanged after client-side visit to `/re`: **PASS**;
+- `/cases` computed styles unchanged after client-side visit to `/re`: **PASS**;
+- browser page errors: **0**.
 
-The verifier checks:
-- exact dependency pins;
-- `/re` protected/lazy route;
-- route is outside legacy `Layout`;
-- required Astryx components are present;
-- RE shell has no Ant Design/domain/API imports;
-- no global Astryx reset, `:root`, or global `body` override enters the RE stylesheet.
+Primary evidence: `evidence/E0_PR_002_RUNTIME_EVIDENCE_v1.md`.
 
-## Server limitation / open acceptance evidence
-The execution server cannot resolve `github.com` or the npm registry through its shell network. Therefore this session cannot honestly generate/update `web/package-lock.json`, install Astryx packages, run Vite build, or capture browser render evidence.
+## Inherited baseline debt / non-scope observations
+The exact imported legacy frontend has existing ESLint debt. This PR uses a non-regression gate rather than expanding scope to repair unrelated legacy files.
 
-This is an evidence limitation, not a declared runtime PASS. Before independent acceptance, a networked worktree must:
-1. apply this patch;
-2. run `npm install --save-exact @astryxdesign/core@0.2.0 @astryxdesign/theme-neutral@0.2.0 @stylexjs/stylex@0.19.0` from `web/` to update the lockfile;
-3. run `npm run verify:re-astryx`;
-4. run `npm run build` and `npm run lint`;
-5. render `/re` as an admin user;
-6. verify legacy `/dashboard`, `/cases`, and other Ant Design routes remain visually/functionally unchanged before and after visiting `/re`.
+The dependency installation also reports inherited npm audit findings. No automatic `npm audit fix` is performed in E0-PR-002 because that can modify dependency versions outside the bounded spike. Dependency-security remediation should be tracked as a separate hardening/corrective item if required by the release gate.
 
 ## Acceptance status
-**NOT SELF-ACCEPTED.** Submit runtime evidence to independent review against E0-PR-002 acceptance criteria.
+**NOT SELF-ACCEPTED.** Runtime implementation evidence is complete and should be submitted to independent review against the E0-PR-002 acceptance criteria. Do not start E0-PR-003 until E0-PR-002 receives the required acceptance verdict.
