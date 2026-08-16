@@ -1,3 +1,4 @@
+# rerun after lifecycle diff-hygiene fix
 name: E0-PR-006 Local Service Boundary verification
 
 on:
