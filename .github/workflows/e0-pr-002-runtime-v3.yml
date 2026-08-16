@@ -1,0 +1,155 @@
+name: E0-PR-002 runtime validation v3
+
+on:
+  push:
+    branches:
+      - agent/e0-pr-002-astryx
+    paths:
+      - .github/workflows/e0-pr-002-runtime-v3.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/e0-pr-002-astryx
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.0'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install baseline and capture lint debt
+        run: |
+          set -euo pipefail
+          cd web
+          npm ci
+          npx eslint . -f json > /tmp/before-eslint.json || true
+
+      - name: Materialize E0-PR-002 and lock exact dependencies
+        run: |
+          set -euo pipefail
+          git apply --check implementation/E0-PR-002_ASTRYX_SPIKE_v1.patch
+          git apply implementation/E0-PR-002_ASTRYX_SPIKE_v1.patch
+          cd web
+          npm install --save-exact \
+            @astryxdesign/core@0.2.0 \
+            @astryxdesign/theme-neutral@0.2.0 \
+            @stylexjs/stylex@0.19.0
+
+      - name: Static verifier and scoped lint
+        run: |
+          set -euo pipefail
+          cd web
+          npm run verify:re-astryx | tee /tmp/static.log
+          npx eslint src/App.jsx src/re/ReShell.jsx scripts/verify-re-astryx-spike.mjs scripts/e0-pr-002-browser-smoke.mjs | tee /tmp/scoped-lint.log
+
+      - name: Full lint non-regression
+        run: |
+          set -euo pipefail
+          cd web
+          npx eslint . -f json > /tmp/after-eslint.json || true
+          python - <<'PY'
+          import json, os
+          root = os.getcwd()
+          changed = {'src/App.jsx','src/re/ReShell.jsx','scripts/verify-re-astryx-spike.mjs','scripts/e0-pr-002-browser-smoke.mjs'}
+          def load(path):
+              out = {}
+              for entry in json.load(open(path, encoding='utf-8')):
+                  rel = os.path.relpath(entry['filePath'], root).replace('\\','/')
+                  out[rel] = sorted((m.get('severity'),m.get('ruleId'),m.get('message'),m.get('line'),m.get('column')) for m in entry.get('messages',[]))
+              return out
+          before, after = load('/tmp/before-eslint.json'), load('/tmp/after-eslint.json')
+          regressions = [p for p in sorted(set(before)|set(after)) if p not in changed and before.get(p,[]) != after.get(p,[])]
+          summary = {
+              'baseline_error_count': sum(1 for ms in before.values() for m in ms if m[0] == 2),
+              'after_error_count': sum(1 for ms in after.values() for m in ms if m[0] == 2),
+              'unchanged_file_regressions': regressions,
+          }
+          json.dump(summary, open('/tmp/lint-summary.json','w'), indent=2)
+          print(json.dumps(summary, indent=2))
+          if regressions: raise SystemExit('lint regressions: ' + ', '.join(regressions))
+          PY
+
+      - name: Production build
+        run: |
+          set -euo pipefail
+          cd web
+          npm run build | tee /tmp/build.log
+
+      - name: Browser smoke with isolated Playwright install
+        run: |
+          set -euo pipefail
+          npm install --prefix /tmp/pw --no-save --package-lock=false playwright@1.54.2
+          /tmp/pw/node_modules/.bin/playwright install --with-deps chromium
+          cp web/scripts/e0-pr-002-browser-smoke.mjs /tmp/pw/smoke.mjs
+
+          cd web
+          npm run dev -- --host 127.0.0.1 > /tmp/vite.log 2>&1 &
+          VITE_PID=$!
+          trap 'kill $VITE_PID || true' EXIT
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:5173/ >/dev/null; then break; fi
+            sleep 1
+          done
+          cd /tmp/pw
+          if ! E0_PR_002_BASE_URL=http://127.0.0.1:5173 node smoke.mjs | tee /tmp/browser.log; then
+            echo '--- VITE LOG ---'
+            cat /tmp/vite.log
+            exit 1
+          fi
+
+      - name: Write evidence
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          BASE=$(python -c "import json; print(json.load(open('/tmp/lint-summary.json'))['baseline_error_count'])")
+          AFTER=$(python -c "import json; print(json.load(open('/tmp/lint-summary.json'))['after_error_count'])")
+          cat > evidence/E0_PR_002_RUNTIME_EVIDENCE_v1.md <<EOF
+          # E0-PR-002 Runtime Evidence v1
+
+          **Date:** 2026-08-16  
+          **Repository:** \`Reguluspt/CEN-Value-RE\`  
+          **Baseline:** \`94ff266a3686b5b5bfd98cb55459dbe7a6cf24d8\`
+
+          ## Result
+          - Node 22.13.0: PASS
+          - exact Astryx dependency lock update: PASS
+          - static verifier: PASS
+          - scoped E0-PR-002 lint: PASS
+          - full legacy lint non-regression: PASS ($BASE errors before; $AFTER after; 0 unchanged-file regressions)
+          - production build: PASS
+          - browser smoke: PASS
+          - client-side CSS isolation after visiting \`/re\`: PASS for \`/dashboard\` and \`/cases\`
+          - browser page errors: 0
+          - \`node_modules/\`: runtime-only and not version-controlled
+
+          ## Acceptance
+          Implementation evidence only. E0-PR-002 is not self-accepted.
+          EOF
+          cp /tmp/static.log evidence/E0-PR-002_static_verification_runtime_v1.log
+          cp /tmp/scoped-lint.log evidence/E0-PR-002_scoped_lint_v1.log
+          cp /tmp/build.log evidence/E0-PR-002_build_v1.log
+          cp /tmp/browser.log evidence/E0-PR-002_browser_smoke_v1.log
+          cp /tmp/lint-summary.json evidence/E0-PR-002_lint_nonregression_v1.json
+
+      - name: Repository guards and commit
+        run: |
+          set -euo pipefail
+          test -z "$(git ls-files 'web/node_modules/**')"
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add web/package.json web/package-lock.json web/src/App.jsx web/src/re web/scripts/verify-re-astryx-spike.mjs web/scripts/e0-pr-002-browser-smoke.mjs \
+            evidence/E0_PR_002_RUNTIME_EVIDENCE_v1.md evidence/E0-PR-002_static_verification_runtime_v1.log evidence/E0-PR-002_scoped_lint_v1.log \
+            evidence/E0-PR-002_build_v1.log evidence/E0-PR-002_browser_smoke_v1.log evidence/E0-PR-002_lint_nonregression_v1.json
+          git commit -m 'E0-PR-002: integrate Astryx spike with runtime evidence'
+          git push origin HEAD:agent/e0-pr-002-astryx
