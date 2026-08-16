@@ -42,12 +42,15 @@ The stale staging copies were replaced from current Library bytes and the compar
 
 ## 3. GitHub import verification
 
-Final canonical import commit:
+Canonical import tree commit:
 `6135e039bf918461cae386e9953af54bb1168619`
 
-PR #1 changed-file inventory after the canonical import commit:
+The PR branch subsequently received only the synchronized R0 status update and this acceptance evidence.
+
+PR #1 changed-file inventory:
 - expected reviewable files: **88**
-- observed changed files: **88**
+- observed reviewable files before acceptance artifact: **88**
+- final changed files after adding this acceptance artifact: **89**
 - forbidden `*.pdf`: **0**
 - forbidden `*.xlsx`: **0**
 - forbidden `*.zip`: **0**
