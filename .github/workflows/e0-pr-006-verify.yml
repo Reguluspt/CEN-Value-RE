@@ -29,7 +29,10 @@ jobs:
       - name: Install local-service dependencies
         run: |
           python -m pip install --disable-pip-version-check -r requirements-re.txt pytest
-          echo "FLASK_RUNTIME=$(python -c \"from importlib.metadata import version; print(version('Flask'))\")" >> "$GITHUB_ENV"
+          python - <<'PY' >> "$GITHUB_ENV"
+          from importlib.metadata import version
+          print("FLASK_RUNTIME=" + version("Flask"))
+          PY
           python -m pip show Flask
       - name: Compile local-service adapter
         run: python -m compileall -q src/re/adapters/local_service
