@@ -15,7 +15,7 @@ function assertNoForbiddenGlobalSelectors(css, label) {
   if (/html\s*\[data-theme=(?:"|')(?:light|dark)(?:"|')\]/.test(css)) {
     failures.push('html[data-theme]');
   }
-  if (/(^|[{}])\s*body(?=\s*[.{:#[]|\s*\{)/m.test(css)) failures.push('body');
+  if (/(^|[{}])\s*body(?:\s|[.#:\[\]>+~])*\{/m.test(css)) failures.push('body');
   if (failures.length) {
     throw new Error(`${label} still contains forbidden global selector(s): ${failures.join(', ')}`);
   }
