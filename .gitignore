@@ -1,0 +1,13 @@
+# Reference/sample binary artifacts are kept in the project Library, not GitHub.
+*.pdf
+*.xlsx
+
+# Generated implementation/archive bundles are kept in the project Library.
+*.zip
+
+# Local/runtime artifacts
+__pycache__/
+*.pyc
+.pytest_cache/
+.DS_Store
+Thumbs.db
