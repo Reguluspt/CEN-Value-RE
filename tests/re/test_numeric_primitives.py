@@ -40,3 +40,23 @@ def test_money_and_unit_price_preserve_decimal_precision() -> None:
 def test_to_decimal_accepts_exact_int_and_string_inputs() -> None:
     assert to_decimal(1_000) == Decimal("1000")
     assert to_decimal("19.35") == Decimal("19.35")
+
+
+def test_common_numeric_and_rounding_modules_contain_no_binary_float_operations() -> None:
+    import ast
+    from pathlib import Path
+
+    common_root = Path(__file__).resolve().parents[2] / "src" / "re" / "domain" / "common"
+    violations = []
+    for path in (common_root / "numeric.py", common_root / "rounding.py"):
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Constant) and isinstance(node.value, float):
+                violations.append(f"{path.name}:{node.lineno} float literal")
+            if (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Name)
+                and node.func.id == "float"
+            ):
+                violations.append(f"{path.name}:{node.lineno} float()")
+    assert not violations, "Binary float operation entered appraisal primitives: " + ", ".join(violations)

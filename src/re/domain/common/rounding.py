@@ -2,15 +2,12 @@
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal, ROUND_HALF_UP, localcontext
 from enum import Enum
 
 from .numeric import DecimalInput, to_decimal
-
-_TARGET_KEY = re.compile(r"^[A-Z][A-Z0-9_]*$")
 
 
 @dataclass(frozen=True, slots=True)
@@ -20,8 +17,10 @@ class RoundingTarget:
     key: str
 
     def __post_init__(self) -> None:
-        if not isinstance(self.key, str) or not _TARGET_KEY.fullmatch(self.key):
-            raise ValueError("rounding target must be an uppercase identifier")
+        if not isinstance(self.key, str):
+            raise TypeError("rounding target key must be a string")
+        if not self.key or self.key != self.key.strip():
+            raise ValueError("rounding target key must be non-empty and trimmed")
 
 
 UNIT_PRICE_TARGET = RoundingTarget("UNIT_PRICE")
@@ -74,11 +73,23 @@ class RoundingPolicy:
             if self.increment_vnd <= 0:
                 raise ValueError("increment_vnd must be positive")
 
+        if self.profile_id is not None and (
+            not isinstance(self.profile_id, str) or not self.profile_id.strip()
+        ):
+            raise ValueError("profile_id must be a non-empty string when provided")
+        if self.profile_version is not None and (
+            not isinstance(self.profile_version, str) or not self.profile_version.strip()
+        ):
+            raise ValueError("profile_version must be a non-empty string when provided")
+        if self.selected_by is not None and (
+            not isinstance(self.selected_by, str) or not self.selected_by.strip()
+        ):
+            raise ValueError("selected_by must be a non-empty string when provided")
         if self.selected_at is not None and not isinstance(self.selected_at, datetime):
             raise TypeError("selected_at must be datetime or None")
 
         if self.source is RoundingSource.CASE_OVERRIDE:
-            if not self.selected_by:
+            if self.selected_by is None:
                 raise ValueError("case override requires selected_by")
             if self.selected_at is None:
                 raise ValueError("case override requires selected_at")

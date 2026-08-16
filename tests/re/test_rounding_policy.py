@@ -215,3 +215,33 @@ def test_rounding_result_keeps_effective_policy_with_raw_and_rounded_values() ->
     assert result.policy is p
     assert result.raw_value == Decimal("196308350")
     assert result.rounded_value == Decimal("196308000")
+
+
+def test_resolver_fails_closed_on_source_mismatch() -> None:
+    wrong_source = policy(
+        TOTAL_VALUE_TARGET,
+        1_000_000,
+        source=RoundingSource.APPLICATION_DEFAULT,
+    )
+    with pytest.raises(ValueError, match="source"):
+        resolve_rounding_policy(
+            target=TOTAL_VALUE_TARGET,
+            case_override=None,
+            profile_default=wrong_source,
+            application_default=None,
+        )
+
+
+def test_resolver_requires_an_effective_policy() -> None:
+    with pytest.raises(ValueError, match="no rounding policy"):
+        resolve_rounding_policy(
+            target=TOTAL_VALUE_TARGET,
+            case_override=None,
+            profile_default=None,
+            application_default=None,
+        )
+
+
+def test_future_rounding_target_is_not_restricted_to_a_closed_enum() -> None:
+    target = RoundingTarget("PROFILE:CONSTRUCTION_COMPONENT")
+    assert target.key == "PROFILE:CONSTRUCTION_COMPONENT"
