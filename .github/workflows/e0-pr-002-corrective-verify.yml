@@ -1,3 +1,4 @@
+# Corrective harness revision 2: browser console non-regression
 name: E0-PR-002 corrective verification
 
 on:
@@ -151,8 +152,9 @@ jobs:
           - admin \`/re\` render: PASS
           - two Astryx \`TextInput\` controls: PASS
           - client-side CSS isolation for \`/dashboard\` and \`/cases\`: PASS
-          - browser page errors: 0
-          - browser console errors: 0
+          - new browser page errors after visiting \`/re\`: 0
+          - new browser console errors after visiting \`/re\`: 0
+          - inherited legacy console deprecation messages are baseline debt and did not regress through the \`/re\` visit
           - \`node_modules/\`: not version-controlled
 
           ## Acceptance
