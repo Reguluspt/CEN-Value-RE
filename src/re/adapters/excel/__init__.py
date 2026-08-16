@@ -1,1 +1,55 @@
-"""CenValue RE excel adapters."""
+"""CenValue RE Excel compatibility adapter infrastructure."""
+
+from .fingerprint import (
+    FingerprintIssue,
+    FingerprintIssueLevel,
+    FingerprintMatchResult,
+    FingerprintStatus,
+    FormulaObservation,
+    SheetObservation,
+    UnsupportedTemplateError,
+    WorkbookFingerprintObservation,
+    formula_signature_digest,
+    match_template_profile,
+    normalize_formula,
+    sheet_state_digest,
+)
+from .n08_0038 import N08_0038_PROFILE
+from .profile import (
+    CellClass,
+    CellRule,
+    CompatibilityTransformation,
+    ExcelTemplateProfile,
+    ExternalLinkPolicy,
+    ExternalLinkState,
+    FormulaAlternative,
+    FormulaSignature,
+    SheetRequirement,
+    SheetState,
+)
+
+__all__ = [
+    "CellClass",
+    "CellRule",
+    "CompatibilityTransformation",
+    "ExcelTemplateProfile",
+    "ExternalLinkPolicy",
+    "ExternalLinkState",
+    "FingerprintIssue",
+    "FingerprintIssueLevel",
+    "FingerprintMatchResult",
+    "FingerprintStatus",
+    "FormulaAlternative",
+    "FormulaObservation",
+    "FormulaSignature",
+    "N08_0038_PROFILE",
+    "SheetObservation",
+    "SheetRequirement",
+    "SheetState",
+    "UnsupportedTemplateError",
+    "WorkbookFingerprintObservation",
+    "formula_signature_digest",
+    "match_template_profile",
+    "normalize_formula",
+    "sheet_state_digest",
+]
