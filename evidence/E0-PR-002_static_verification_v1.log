@@ -1,0 +1,6 @@
+E0-PR-002 static verification PASSED
+- exact Astryx dependency pins present
+- /re route is protected, lazy-loaded, and outside legacy Layout
+- AppShell + SideNav + FormLayout + TextInput present
+- RE shell imports only React, Astryx, and its scoped stylesheet
+- global Astryx reset/:root/body overrides excluded

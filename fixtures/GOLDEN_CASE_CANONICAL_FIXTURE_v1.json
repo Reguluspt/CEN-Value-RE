@@ -1,0 +1,111 @@
+{
+  "fixture_id": "N08-0038-canonical-v1",
+  "status": "NORMALIZED_FROM_LEGACY_CACHE; PARTIAL INPUT COVERAGE",
+  "source": {
+    "raw_fixture": "gate-b/GOLDEN_CASE_CANONICAL_FIXTURE_v0.1.json",
+    "source_workbook": "(Trunghd_HTG) N08-0038-Huedtl-MTNguyenVanDau-P5-PhuNhuan-htg.xlsx",
+    "source_workbook_sha256": "d410cfcc2263d7d50a436a79e192461f04b6863e6c3676a28da7a2eed287389c",
+    "legacy_excel_serial_appraisal_date": "46239"
+  },
+  "case": {
+    "appraisal_date": "2026-08-05",
+    "bank_or_profile_selector": "BIDV",
+    "bank_or_profile_selector_raw": "BIDV "
+  },
+  "subject": {
+    "current_address": "Số 05 Nguyễn Văn Đậu, phường 5, quận Phú Nhuận, Tp.HCM (nay là phường Đức Nhuận, Tp.HCM)",
+    "province": "Tp. HCM",
+    "district": "quận Phú Nhuận",
+    "commune": "phường 05",
+    "street": "Nguyễn Văn Đậu",
+    "house_number": "Số 05",
+    "lat": "10.804423",
+    "lng": "106.686861",
+    "parcel_number": "24",
+    "map_sheet": "29/BĐĐC",
+    "area_total": "103.2",
+    "area_residential_compliant": "82.93",
+    "area_residential_noncompliant": "20.27",
+    "frontage": "3.9",
+    "depth": "27.33",
+    "shape": "Tương đối vuông vức",
+    "construction": {
+      "type": "Nhà phố",
+      "floors": "3 tầng + sân thượng",
+      "year_built": "2008",
+      "structure": "Tường gạch, sàn BTCT, mái BTCT",
+      "gross_floor_area": "253.4",
+      "compliant_floor_area": "253.4",
+      "economic_life_years": "50",
+      "maintenance_condition_pct": "0.05"
+    }
+  },
+  "comparables": [
+    {
+      "asking_price": "21500000000",
+      "negotiated_price": "18280000000",
+      "transaction_success_factor": "0.85",
+      "area": "68.3",
+      "frontage": "3.55",
+      "depth": "19.35",
+      "shape": "Tương đối vuông vức",
+      "building_area": "327.59",
+      "building_remaining_quality": "0.75"
+    },
+    {
+      "asking_price": "88000000000",
+      "negotiated_price": "74800000000",
+      "transaction_success_factor": "0.85",
+      "area": "299",
+      "frontage": "15",
+      "depth": "20",
+      "shape": "Không vuông vức",
+      "building_area": "569",
+      "building_remaining_quality": "0.8"
+    },
+    {
+      "asking_price": "38000000000",
+      "negotiated_price": "32300000000",
+      "transaction_success_factor": "0.85",
+      "area": "149",
+      "frontage": "6.1",
+      "depth": "25.5",
+      "shape": "Không vuông vức",
+      "building_area": "420",
+      "building_remaining_quality": "0.75"
+    }
+  ],
+  "expected": {
+    "indicated_prices": [
+      "196308350",
+      "227083250",
+      "212201640"
+    ],
+    "selected_indication": "196308350",
+    "rounded_indication": "196308000",
+    "construction_total": "1152970000",
+    "land_total": "18428442440",
+    "total_before_rounding": "19581412440",
+    "final_rounded_value": "19581000000"
+  },
+  "normalization": {
+    "percentage_representation": "fractional decimal; 0.05 = 5%",
+    "money_representation": "base-unit VND decimal/integer strings",
+    "date_representation": "ISO-8601 calendar date",
+    "binary_float_cleanup": {
+      "comparables[0].depth": {
+        "raw": "19.350000000000001",
+        "canonical": "19.35"
+      },
+      "comparables[0].building_area": {
+        "raw": "327.58999999999997",
+        "canonical": "327.59"
+      }
+    }
+  },
+  "open_input_coverage": [
+    "explicit adjustment decisions C1-C11 per comparable are not yet present in the source fixture",
+    "construction component deterioration observations are not yet present in the source fixture",
+    "planning/noncompliant unit-price source should remain traceable to the applicable source cell/profile"
+  ]
+}

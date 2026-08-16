@@ -1,0 +1,247 @@
+diff --git a/web/package.json b/web/package.json
+index 41edc5d..64354e9 100644
+--- a/web/package.json
++++ b/web/package.json
+@@ -7,9 +7,13 @@
+     "dev": "vite",
+     "build": "vite build",
+     "lint": "eslint .",
+-    "preview": "vite preview"
++    "preview": "vite preview",
++    "verify:re-astryx": "node scripts/verify-re-astryx-spike.mjs"
+   },
+   "dependencies": {
++    "@astryxdesign/core": "0.2.0",
++    "@astryxdesign/theme-neutral": "0.2.0",
++    "@stylexjs/stylex": "0.19.0",
+     "@ant-design/icons": "^6.2.5",
+     "@dnd-kit/core": "^6.3.1",
+     "@dnd-kit/sortable": "^10.0.0",
+diff --git a/web/scripts/verify-re-astryx-spike.mjs b/web/scripts/verify-re-astryx-spike.mjs
+new file mode 100644
+index 0000000..5e89e36
+--- /dev/null
++++ b/web/scripts/verify-re-astryx-spike.mjs
+@@ -0,0 +1,60 @@
++import fs from 'node:fs';
++import path from 'node:path';
++import process from 'node:process';
++
++const webRoot = process.cwd();
++const read = (relative) => fs.readFileSync(path.join(webRoot, relative), 'utf8');
++const failures = [];
++const assert = (condition, message) => {
++  if (!condition) failures.push(message);
++};
++
++const pkg = JSON.parse(read('package.json'));
++const app = read('src/App.jsx');
++const shell = read('src/re/ReShell.jsx');
++const css = read('src/re/astryx.css');
++
++assert(pkg.dependencies['@astryxdesign/core'] === '0.2.0', 'Astryx core must be pinned to 0.2.0');
++assert(pkg.dependencies['@astryxdesign/theme-neutral'] === '0.2.0', 'Neutral theme must be pinned to 0.2.0');
++assert(pkg.dependencies['@stylexjs/stylex'] === '0.19.0', 'StyleX peer must be pinned to 0.19.0');
++assert(app.includes("lazy(() => import('./re/ReShell'))"), '/re shell must be lazy-loaded');
++
++const reRouteIndex = app.indexOf('path="/re"');
++const reRouteBlock = reRouteIndex >= 0 ? app.slice(reRouteIndex, reRouteIndex + 600) : '';
++assert(reRouteIndex >= 0, 'App router must expose /re');
++assert(reRouteBlock.includes('<ProtectedRoute adminOnly={true}>'), '/re must remain behind existing admin protection');
++assert(reRouteBlock.includes('<Suspense'), '/re must lazy-load behind Suspense');
++assert(!reRouteBlock.includes('<Layout>'), '/re must not reuse legacy Ant Design Layout');
++
++assert(shell.includes("from '@astryxdesign/core/AppShell'"), 'RE shell must use Astryx AppShell');
++assert(shell.includes("from '@astryxdesign/core/SideNav'"), 'RE shell must use Astryx SideNav');
++assert(shell.includes("from '@astryxdesign/core/FormLayout'"), 'RE shell must use Astryx FormLayout');
++assert(shell.includes("from '@astryxdesign/core/TextInput'"), 'RE shell must use Astryx TextInput');
++assert(shell.includes("from '@astryxdesign/core/theme'"), 'RE shell must use Astryx Theme provider');
++assert(shell.includes("from '@astryxdesign/theme-neutral/built'"), 'RE shell must use prebuilt Neutral theme');
++
++const importSources = [...shell.matchAll(/(?:from\s+|import\s+)['"]([^'"]+)['"]/g)].map((match) => match[1]);
++const disallowedImports = importSources.filter((source) =>
++  source !== 'react' &&
++  source !== './astryx.css' &&
++  !source.startsWith('@astryxdesign/')
++);
++assert(disallowedImports.length === 0, `RE shell has non-Astryx/application imports: ${disallowedImports.join(', ')}`);
++
++assert(!css.includes("@import '@astryxdesign/core/reset.css'"), 'Global Astryx reset must not be imported in isolated spike');
++assert(css.includes('.cenvalue-re-surface'), 'Compatibility reset must be scoped to .cenvalue-re-surface');
++assert(!css.includes(':root'), 'RE CSS must not override global :root');
++assert(!/^body\s*\{/m.test(css), 'RE CSS must not override global body');
++
++if (failures.length) {
++  console.error('E0-PR-002 static verification FAILED');
++  for (const failure of failures) console.error(`- ${failure}`);
++  process.exit(1);
++}
++
++console.log('E0-PR-002 static verification PASSED');
++console.log('- exact Astryx dependency pins present');
++console.log('- /re route is protected, lazy-loaded, and outside legacy Layout');
++console.log('- AppShell + SideNav + FormLayout + TextInput present');
++console.log('- RE shell imports only React, Astryx, and its scoped stylesheet');
++console.log('- global Astryx reset/:root/body overrides excluded');
+diff --git a/web/src/App.jsx b/web/src/App.jsx
+index 34b943c..035618f 100644
+--- a/web/src/App.jsx
++++ b/web/src/App.jsx
+@@ -1,3 +1,4 @@
++import { lazy, Suspense } from 'react';
+ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+ import { useAuth } from './hooks/useAuth';
+ import Layout from './components/Layout';
+@@ -13,6 +14,8 @@ import Directories from './pages/Directories';
+ import Templates from './pages/Templates';
+ import Settings from './pages/Settings';
+ 
++const ReShell = lazy(() => import('./re/ReShell'));
++
+ // Helper component to redirect root path "/" to dashboard or sobo based on user role
+ function RootRedirect() {
+   const { isGuest } = useAuth();
+@@ -145,6 +148,18 @@ function App() {
+           }
+         />
+ 
++        {/* Isolated CenValue RE / Astryx spike */}
++        <Route
++          path="/re"
++          element={
++            <ProtectedRoute adminOnly={true}>
++              <Suspense fallback={<div>Đang tải CenValue RE...</div>}>
++                <ReShell />
++              </Suspense>
++            </ProtectedRoute>
++          }
++        />
++
+         {/* Catch-all Fallback */}
+         <Route path="*" element={<Navigate to="/" replace />} />
+       </Routes>
+diff --git a/web/src/re/ReShell.jsx b/web/src/re/ReShell.jsx
+new file mode 100644
+index 0000000..6868874
+--- /dev/null
++++ b/web/src/re/ReShell.jsx
+@@ -0,0 +1,57 @@
++import { useState } from 'react';
++import { AppShell } from '@astryxdesign/core/AppShell';
++import { FormLayout } from '@astryxdesign/core/FormLayout';
++import { SideNav, SideNavItem, SideNavSection } from '@astryxdesign/core/SideNav';
++import { Text } from '@astryxdesign/core/Text';
++import { TextInput } from '@astryxdesign/core/TextInput';
++import { Theme } from '@astryxdesign/core/theme';
++import { neutralTheme } from '@astryxdesign/theme-neutral/built';
++import './astryx.css';
++
++function ReShell() {
++  const [caseCode, setCaseCode] = useState('');
++  const [propertyAddress, setPropertyAddress] = useState('');
++
++  const sideNav = (
++    <SideNav>
++      <SideNavSection title="CenValue RE">
++        <SideNavItem label="Integration spike" href="/re" isSelected />
++        <SideNavItem label="Legacy dashboard" href="/dashboard" />
++      </SideNavSection>
++    </SideNav>
++  );
++
++  return (
++    <Theme theme={neutralTheme}>
++      <div className="cenvalue-re-surface" data-re-astryx-spike="v1">
++        <AppShell contentPadding={0} sideNav={sideNav}>
++          <main className="cenvalue-re-spike-content">
++            <div className="cenvalue-re-spike-heading">
++              <Text type="large">CenValue RE — Astryx integration spike</Text>
++              <Text type="body">
++                Surface thử nghiệm độc lập để kiểm tra AppShell, SideNav và FormLayout.
++              </Text>
++            </div>
++
++            <section className="cenvalue-re-spike-form" aria-label="RE form spike">
++              <FormLayout>
++                <TextInput
++                  label="Mã hồ sơ"
++                  value={caseCode}
++                  onChange={setCaseCode}
++                />
++                <TextInput
++                  label="Địa chỉ tài sản"
++                  value={propertyAddress}
++                  onChange={setPropertyAddress}
++                />
++              </FormLayout>
++            </section>
++          </main>
++        </AppShell>
++      </div>
++    </Theme>
++  );
++}
++
++export default ReShell;
+diff --git a/web/src/re/astryx.css b/web/src/re/astryx.css
+new file mode 100644
+index 0000000..c971b08
+--- /dev/null
++++ b/web/src/re/astryx.css
+@@ -0,0 +1,56 @@
++/*
++ * E0-PR-002 isolation rule:
++ * Do NOT import @astryxdesign/core/reset.css here. Astryx's reset is global and
++ * would alter legacy Ant Design / application surfaces after the /re chunk is
++ * loaded. The spike loads only Astryx component CSS + Neutral theme CSS and
++ * supplies a minimal reset scoped to the CenValue RE surface.
++ */
++@import '@astryxdesign/core/astryx.css';
++@import '@astryxdesign/theme-neutral/theme.css';
++
++.cenvalue-re-surface {
++  min-height: 100svh;
++  width: 100%;
++  color: var(--color-text-primary);
++  background: var(--color-background-body);
++  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
++  font-size: 16px;
++  line-height: 1.5;
++}
++
++.cenvalue-re-surface :where(*, *::before, *::after) {
++  box-sizing: border-box;
++}
++
++.cenvalue-re-surface :where(button, input, optgroup, select, textarea) {
++  margin: 0;
++  font: inherit;
++  color: inherit;
++}
++
++.cenvalue-re-surface :where(h1, h2, h3, h4, h5, h6, p) {
++  margin: 0;
++}
++
++.cenvalue-re-spike-content {
++  display: flex;
++  flex-direction: column;
++  gap: 24px;
++  width: min(760px, 100%);
++  margin: 0 auto;
++  padding: 32px;
++}
++
++.cenvalue-re-spike-heading {
++  display: flex;
++  flex-direction: column;
++  gap: 8px;
++}
++
++.cenvalue-re-spike-form {
++  width: 100%;
++  padding: 24px;
++  border: 1px solid var(--color-border);
++  border-radius: var(--radius-container);
++  background: var(--color-background-surface);
++}
