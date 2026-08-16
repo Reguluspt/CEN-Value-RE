@@ -1,0 +1,10 @@
+E0-PR-002 browser smoke PASSED
+- unauthenticated /re redirected to /login
+- guest /re redirected to /sobo
+- /re rendered as mocked admin
+- two Astryx TextInput controls rendered
+- /dashboard computed styles unchanged after client-side /re visit
+- /cases computed styles unchanged after client-side /re visit
+- legacy console error baseline: 5 unique message(s)
+- new browser page errors after /re: 0
+- new browser console errors after /re: 0
