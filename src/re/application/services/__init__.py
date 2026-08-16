@@ -1,1 +1,37 @@
 """Application services package."""
+
+from .golden_fixture import (
+    CheckpointManifest,
+    CheckpointOutcome,
+    CheckpointReport,
+    CheckpointSpec,
+    ComparisonKind,
+    ComparisonPolicy,
+    GoldenFixtureBundle,
+    GoldenFixtureFormatError,
+    GoldenFixtureSnapshot,
+    compare_checkpoint,
+    evaluate_checkpoint_results,
+    load_checkpoint_manifest,
+    load_golden_bundle,
+    load_golden_fixture,
+    resolve_json_pointer,
+)
+
+__all__ = [
+    "CheckpointManifest",
+    "CheckpointOutcome",
+    "CheckpointReport",
+    "CheckpointSpec",
+    "ComparisonKind",
+    "ComparisonPolicy",
+    "GoldenFixtureBundle",
+    "GoldenFixtureFormatError",
+    "GoldenFixtureSnapshot",
+    "compare_checkpoint",
+    "evaluate_checkpoint_results",
+    "load_checkpoint_manifest",
+    "load_golden_bundle",
+    "load_golden_fixture",
+    "resolve_json_pointer",
+]
