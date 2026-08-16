@@ -24,7 +24,7 @@ All 88 target files were materialized from current Library versions and SHA-256 
 Canonical baseline import commit:
 `6135e039bf918461cae386e9953af54bb1168619`
 
-Before generating the R0 acceptance artifact, PR #1 showed exactly **88 changed files**, matching the approved reviewable target.
+Before generating the R0 acceptance artifact, PR #1 showed exactly **88 changed files**, matching the approved reviewable target. The acceptance report adds one review artifact, so the final PR contains **89 changed files**.
 
 Forbidden repository artifacts found:
 - `*.pdf`: 0
