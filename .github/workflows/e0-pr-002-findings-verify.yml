@@ -1,3 +1,4 @@
+# Corrective verification revision 2 — CSS comments excluded from selector checks
 name: E0-PR-002 findings corrective verification
 
 on:
