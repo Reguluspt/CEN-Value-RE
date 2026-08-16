@@ -17,7 +17,7 @@ Those assets remain in the canonical project Library and are not required for th
 
 ## Version-controlled content
 
-GitHub is intended to contain the reviewable/source-of-truth artifacts needed to continue engineering work, including:
+GitHub contains the reviewable/source-of-truth artifacts needed to continue engineering work, including:
 
 - Design Book;
 - Gate A / Gate B contracts and evidence;
@@ -26,8 +26,6 @@ GitHub is intended to contain the reviewable/source-of-truth artifacts needed to
 - canonical fixtures and mapping data;
 - implementation patches and reports;
 - text logs, hash manifests, and engineering reports.
-
-`BRAINSTORM Full.md` is treated as a Library-only provenance archive rather than an implementation source of truth; current decisions must come from the latest handoff, Gate closure, Design Book, and specialized contracts.
 
 ## Current project stage
 

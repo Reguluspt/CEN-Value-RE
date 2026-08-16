@@ -1,0 +1,23 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_____________ test_domain_has_no_framework_or_adapter_dependencies _____________
+
+    def test_domain_has_no_framework_or_adapter_dependencies() -> None:
+        violations: list[str] = []
+        for path in _python_files(DOMAIN_ROOT):
+            for module in _imports(path):
+                if _starts_with_any(module, DOMAIN_FORBIDDEN_PREFIXES):
+                    violations.append(f"{path.relative_to(RE_ROOT)} -> {module}")
+>       assert not violations, "Forbidden domain imports:\n" + "\n".join(violations)
+E       AssertionError: Forbidden domain imports:
+E         domain/cases/__init__.py -> re.adapters
+E         domain/cases/__init__.py -> re.adapters.persistence
+E       assert not ['domain/cases/__init__.py -> re.adapters', 'domain/cases/__init__.py -> re.adapters.persistence']
+
+tests/re/test_architecture_boundaries.py:116: AssertionError
+=========================== short test summary info ============================
+FAILED tests/re/test_architecture_boundaries.py::test_domain_has_no_framework_or_adapter_dependencies - AssertionError: Forbidden domain imports:
+  domain/cases/__init__.py -> re.adapters
+  domain/cases/__init__.py -> re.adapters.persistence
+assert not ['domain/cases/__init__.py -> re.adapters', 'domain/cases/__init__.py -> re.adapters.persistence']
+1 failed in 0.04s

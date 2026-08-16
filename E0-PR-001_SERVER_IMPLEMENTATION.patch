@@ -1,0 +1,295 @@
+diff --git a/E0_PR_001_IMPLEMENTATION_REPORT.md b/E0_PR_001_IMPLEMENTATION_REPORT.md
+new file mode 100644
+--- /dev/null
++++ b/E0_PR_001_IMPLEMENTATION_REPORT.md
+@@ -0,0 +1,32 @@
++# E0-PR-001 — Server Implementation Report
++
++## Scope
++Additive CenValue RE bounded-context skeleton and executable architecture import guards.
++
++## Implemented
++- `src/re/domain/*` bounded packages.
++- `src/re/application/{commands,queries,services}`.
++- `src/re/ports/{persistence,excel,providers}.py`.
++- `src/re/adapters/{persistence,excel,providers}`.
++- AST-based architecture tests with no new third-party dependency.
++- Smoke import test.
++
++## Intentionally deferred
++- Numeric/Percentage/RoundingPolicy implementation → E0-PR-003.
++- Astryx → E0-PR-002.
++- Concrete repositories/persistence → E0-PR-007.
++- ExcelTemplateProfile → E0-PR-004.
++- API/Flask wiring → E0-PR-006.
++- Business formulas/entities → later scoped PRs.
++
++## Corrective compatibility
++- No duplicate valuation result naming introduced.
++- No opaque `coordinates: str` introduced; GeoLocation remains reserved for its owning domain contract.
++- No framework/Excel/provider dependency enters Domain.
++
++## Server limitation
++The server cannot clone GitHub directly because outbound DNS/network access from the execution container is disabled. Repository structure and current rules were inspected through the connected GitHub source. This implementation is therefore produced as a surgical additive patch/worktree payload and is not published to GitHub.
++
++## Acceptance
++Run:
++`python -m pytest tests/re/test_architecture_boundaries.py tests/re/test_package_imports.py -q`
+diff --git a/src/re/__init__.py b/src/re/__init__.py
+new file mode 100644
+--- /dev/null
++++ b/src/re/__init__.py
+@@ -0,0 +1,5 @@
++"""CenValue RE bounded context.
++
++This package is additive to the legacy application. New RE domain code must not
++depend on Flask, React/Tauri, persistence frameworks, Excel libraries, or AI SDKs.
++"""
+diff --git a/src/re/adapters/__init__.py b/src/re/adapters/__init__.py
+new file mode 100644
+--- /dev/null
++++ b/src/re/adapters/__init__.py
+@@ -0,0 +1 @@
++"""Infrastructure adapters for CenValue RE."""
+diff --git a/src/re/adapters/excel/__init__.py b/src/re/adapters/excel/__init__.py
+new file mode 100644
+--- /dev/null
++++ b/src/re/adapters/excel/__init__.py
+@@ -0,0 +1 @@
++"""CenValue RE excel adapters."""
+diff --git a/src/re/adapters/persistence/__init__.py b/src/re/adapters/persistence/__init__.py
+new file mode 100644
+--- /dev/null
++++ b/src/re/adapters/persistence/__init__.py
+@@ -0,0 +1 @@
++"""CenValue RE persistence adapters."""
+diff --git a/src/re/adapters/providers/__init__.py b/src/re/adapters/providers/__init__.py
+new file mode 100644
+--- /dev/null
++++ b/src/re/adapters/providers/__init__.py
+@@ -0,0 +1 @@
++"""CenValue RE providers adapters."""
+diff --git a/src/re/application/__init__.py b/src/re/application/__init__.py
+new file mode 100644
+--- /dev/null
++++ b/src/re/application/__init__.py
+@@ -0,0 +1 @@
++"""CenValue RE application/use-case layer."""
+diff --git a/src/re/application/commands/__init__.py b/src/re/application/commands/__init__.py
+new file mode 100644
+--- /dev/null
++++ b/src/re/application/commands/__init__.py
+@@ -0,0 +1 @@
++"""Application commands package."""
+diff --git a/src/re/application/queries/__init__.py b/src/re/application/queries/__init__.py
+new file mode 100644
+--- /dev/null
++++ b/src/re/application/queries/__init__.py
+@@ -0,0 +1 @@
++"""Application queries package."""
+diff --git a/src/re/application/services/__init__.py b/src/re/application/services/__init__.py
+new file mode 100644
+--- /dev/null
++++ b/src/re/application/services/__init__.py
+@@ -0,0 +1 @@
++"""Application services package."""
+diff --git a/src/re/domain/__init__.py b/src/re/domain/__init__.py
+new file mode 100644
+--- /dev/null
++++ b/src/re/domain/__init__.py
+@@ -0,0 +1 @@
++"""Framework-independent CenValue RE domain."""
+diff --git a/src/re/domain/adjustment/__init__.py b/src/re/domain/adjustment/__init__.py
+new file mode 100644
+--- /dev/null
++++ b/src/re/domain/adjustment/__init__.py
+@@ -0,0 +1 @@
++"""CenValue RE adjustment domain package."""
+diff --git a/src/re/domain/approval/__init__.py b/src/re/domain/approval/__init__.py
+new file mode 100644
+--- /dev/null
++++ b/src/re/domain/approval/__init__.py
+@@ -0,0 +1 @@
++"""CenValue RE approval domain package."""
+diff --git a/src/re/domain/cases/__init__.py b/src/re/domain/cases/__init__.py
+new file mode 100644
+--- /dev/null
++++ b/src/re/domain/cases/__init__.py
+@@ -0,0 +1 @@
++"""CenValue RE cases domain package."""
+diff --git a/src/re/domain/common/__init__.py b/src/re/domain/common/__init__.py
+new file mode 100644
+--- /dev/null
++++ b/src/re/domain/common/__init__.py
+@@ -0,0 +1,4 @@
++"""Shared framework-independent domain primitives.
++
++Numeric and rounding primitives are intentionally deferred to E0-PR-003.
++"""
+diff --git a/src/re/domain/construction/__init__.py b/src/re/domain/construction/__init__.py
+new file mode 100644
+--- /dev/null
++++ b/src/re/domain/construction/__init__.py
+@@ -0,0 +1 @@
++"""CenValue RE construction domain package."""
+diff --git a/src/re/domain/property/__init__.py b/src/re/domain/property/__init__.py
+new file mode 100644
+--- /dev/null
++++ b/src/re/domain/property/__init__.py
+@@ -0,0 +1 @@
++"""CenValue RE property domain package."""
+diff --git a/src/re/domain/valuation/__init__.py b/src/re/domain/valuation/__init__.py
+new file mode 100644
+--- /dev/null
++++ b/src/re/domain/valuation/__init__.py
+@@ -0,0 +1 @@
++"""CenValue RE valuation domain package."""
+diff --git a/src/re/ports/__init__.py b/src/re/ports/__init__.py
+new file mode 100644
+--- /dev/null
++++ b/src/re/ports/__init__.py
+@@ -0,0 +1,4 @@
++"""Port interfaces owned by the CenValue RE core.
++
++Concrete infrastructure belongs under ``re.adapters``.
++"""
+diff --git a/src/re/ports/excel.py b/src/re/ports/excel.py
+new file mode 100644
+--- /dev/null
++++ b/src/re/ports/excel.py
+@@ -0,0 +1,4 @@
++"""Excel compatibility port boundary.
++
++No openpyxl/COM dependency is permitted in this module.
++"""
+diff --git a/src/re/ports/persistence.py b/src/re/ports/persistence.py
+new file mode 100644
+--- /dev/null
++++ b/src/re/ports/persistence.py
+@@ -0,0 +1,5 @@
++"""Persistence port boundary.
++
++Concrete repository contracts are introduced with the aggregate that owns them;
++this module deliberately contains no database/framework dependency.
++"""
+diff --git a/src/re/ports/providers.py b/src/re/ports/providers.py
+new file mode 100644
+--- /dev/null
++++ b/src/re/ports/providers.py
+@@ -0,0 +1,4 @@
++"""External provider port boundary.
++
++AI/provider SDK imports belong only in adapters.
++"""
+diff --git a/tests/re/test_architecture_boundaries.py b/tests/re/test_architecture_boundaries.py
+new file mode 100644
+--- /dev/null
++++ b/tests/re/test_architecture_boundaries.py
+@@ -0,0 +1,91 @@
++"""Architecture guardrails for the CenValue RE bounded context."""
++
++from __future__ import annotations
++
++import ast
++from pathlib import Path
++
++RE_ROOT = Path(__file__).resolve().parents[2] / "src" / "re"
++DOMAIN_ROOT = RE_ROOT / "domain"
++CORE_ROOTS = (DOMAIN_ROOT, RE_ROOT / "application", RE_ROOT / "ports")
++
++DOMAIN_FORBIDDEN_PREFIXES = (
++    "flask",
++    "sqlalchemy",
++    "openpyxl",
++    "pydantic",
++    "fastapi",
++    "uvicorn",
++    "google",
++    "openai",
++    "langchain",
++    "playwright",
++    "sqlite3",
++    "aiosqlite",
++    "api",
++    "src.database_manager",
++    "src.sqlite_store",
++    "re.adapters",
++)
++CORE_FORBIDDEN_PREFIXES = (
++    "re.adapters",
++)
++
++
++def _imports(path: Path) -> list[str]:
++    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
++    found: list[str] = []
++    for node in ast.walk(tree):
++        if isinstance(node, ast.Import):
++            found.extend(alias.name for alias in node.names)
++        elif isinstance(node, ast.ImportFrom) and node.module:
++            found.append(node.module)
++    return found
++
++
++def _python_files(root: Path):
++    return sorted(root.rglob("*.py"))
++
++
++def _starts_with_any(module: str, prefixes: tuple[str, ...]) -> bool:
++    return any(module == prefix or module.startswith(prefix + ".") for prefix in prefixes)
++
++
++def test_domain_has_no_framework_or_adapter_dependencies() -> None:
++    violations: list[str] = []
++    for path in _python_files(DOMAIN_ROOT):
++        for module in _imports(path):
++            if _starts_with_any(module, DOMAIN_FORBIDDEN_PREFIXES):
++                violations.append(f"{path.relative_to(RE_ROOT)} -> {module}")
++    assert not violations, "Forbidden domain imports:\n" + "\n".join(violations)
++
++
++def test_core_layers_do_not_import_adapters() -> None:
++    violations: list[str] = []
++    for root in CORE_ROOTS:
++        for path in _python_files(root):
++            for module in _imports(path):
++                if _starts_with_any(module, CORE_FORBIDDEN_PREFIXES):
++                    violations.append(f"{path.relative_to(RE_ROOT)} -> {module}")
++    assert not violations, "Core-to-adapter imports:\n" + "\n".join(violations)
++
++
++def test_expected_bounded_context_packages_exist() -> None:
++    required = (
++        "domain/cases",
++        "domain/property",
++        "domain/construction",
++        "domain/adjustment",
++        "domain/valuation",
++        "domain/approval",
++        "domain/common",
++        "application/commands",
++        "application/queries",
++        "application/services",
++        "ports",
++        "adapters/persistence",
++        "adapters/excel",
++        "adapters/providers",
++    )
++    missing = [name for name in required if not (RE_ROOT / name).is_dir()]
++    assert not missing, f"Missing RE packages: {missing}"
+diff --git a/tests/re/test_package_imports.py b/tests/re/test_package_imports.py
+new file mode 100644
+--- /dev/null
++++ b/tests/re/test_package_imports.py
+@@ -0,0 +1,11 @@
++"""Smoke tests for the additive RE package skeleton."""
++
++from src import re as re_context
++from src.re import application, domain, ports
++
++
++def test_re_core_packages_import_without_infrastructure() -> None:
++    assert re_context is not None
++    assert domain is not None
++    assert application is not None
++    assert ports is not None

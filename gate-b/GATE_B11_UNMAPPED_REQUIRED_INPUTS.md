@@ -1,0 +1,242 @@
+# Gate B.11 — Unmapped Required Input Audit
+
+Direct input dependencies found: **352** unique cells.
+Already represented in mapping matrix: **118**.
+Unmapped direct dependencies: **234**.
+
+This list is dependency-derived; not every cell is a user-editable business input. Each must be classified as INPUT, CONTROL, LEGACY_ONLY, or NOT_REQUIRED_FOR_WALKING_SKELETON.
+
+- `Hồ sơ!B19` → used by Data!B22
+- `Hồ sơ!D19` → used by Data!B22
+- `Hồ sơ!E10` → used by Data!B13, Data!B21
+- `Hồ sơ!E12` → used by Data!J7, Offical!E5
+- `Hồ sơ!E15` → used by Data!B12
+- `Hồ sơ!E4` → used by Data!L2, Sheet1!A3
+- `Hồ sơ!E5` → used by Bangtinh!B164, Data!B6, Data!E6, Data!L3, Offical!E4
+- `Hồ sơ!E7` → used by Data!B10
+- `Hồ sơ!E9` → used by Data!B16
+- `Hồ sơ!F19` → used by Data!B22
+- `Hồ sơ!F23` → used by Data!C284, Data!I309, Offical!E2
+- `Hồ sơ!F25` → used by Data!B285, Data!I310
+- `Hồ sơ!F26` → used by Offical!E6
+- `Hồ sơ!G13` → used by Sheet1!A166
+- `Hồ sơ!G14` → used by Bangtinh!C174, Bangtinh!C180, Bangtinh!C181, Bangtinh!C182, Bangtinh!E169, Bangtinh!E178…
+- `Hồ sơ!G19` → used by Data!B22
+- `Hồ sơ!G6` → used by Data!B4
+- `Hồ sơ!G7` → used by Data!C8
+- `Hồ sơ!G8` → used by Data!B5
+- `Hồ sơ!I19` → used by Data!B24, Data!C23, Offical!E11
+- `Hồ sơ!I25` → used by Data!C285, Data!J310
+- `Hồ sơ!I4` → used by Data!F9, Data!K3, Sheet1!A3, Sheet1!A33
+- `Hồ sơ!I5` → used by Data!B7, Data!J8
+- `Hồ sơ!K19` → used by Data!B23, Data!C23
+- `Hồ sơ!K24` → used by Offical!E3
+- `Hồ sơ!K26` → used by Offical!E7
+- `Nhập liệu!B37` → used by Data!E48
+- `Nhập liệu!B41` → used by Data!E52
+- `Nhập liệu!B45` → used by Data!E56
+- `Nhập liệu!B67` → used by Bangtinh!B21
+- `Nhập liệu!B68` → used by Bangtinh!B22
+- `Nhập liệu!B97` → used by Data!I90
+- `Nhập liệu!C38` → used by Bangtinh!C171, Data!A59, Data!E49
+- `Nhập liệu!C39` → used by Bangtinh!C172, Data!A60, Data!E50
+- `Nhập liệu!C40` → used by Bangtinh!C173, Data!A61, Data!E51
+- `Nhập liệu!C42` → used by Bangtinh!C175, Data!E53
+- `Nhập liệu!C43` → used by Bangtinh!C176, Data!A62, Data!E54
+- `Nhập liệu!C44` → used by Bangtinh!C177, Data!A63, Data!E55
+- `Nhập liệu!C79` → used by Data!A115, Data!B84
+- `Nhập liệu!C80` → used by Data!A116, Data!B85
+- `Nhập liệu!C81` → used by Data!A117, Data!B86
+- `Nhập liệu!C82` → used by Data!A118, Data!B87
+- `Nhập liệu!D26` → used by Sheet1!F93
+- `Nhập liệu!E23` → used by Sheet1!A50, Sheet1!G90, Sheet1!K30
+- `Nhập liệu!E24` → used by Sheet1!G91, Sheet1!K31, Sheet1!K32, Sheet1!K33
+- `Nhập liệu!E25` → used by Sheet1!G92, Sheet1!K31, Sheet1!K32, Sheet1!K33
+- `Nhập liệu!F12` → used by Data!A47, Sheet1!A156, Sheet1!A72
+- `Nhập liệu!F23` → used by Sheet1!H29
+- `Nhập liệu!F24` → used by Sheet1!H49
+- `Nhập liệu!F25` → used by Sheet1!H69
+- `Nhập liệu!F26` → used by Sheet1!G93
+- `Nhập liệu!F27` → used by Bangtinh!E14
+- `Nhập liệu!F29` → used by Data!B47
+- `Nhập liệu!F30` → used by Data!B48
+- `Nhập liệu!F31` → used by Bangtinh!B24, Bangtinh!B29, Data!B49
+- `Nhập liệu!F32` → used by Bangtinh!B25, Bangtinh!B30, Data!B50
+- `Nhập liệu!F33` → used by Bangtinh!B26, Bangtinh!B31, Data!B51
+- `Nhập liệu!F37` → used by Data!F48
+- `Nhập liệu!F39` → used by Bangtinh!E172, Bangtinh!E25, Data!B60, Data!F50
+- `Nhập liệu!F40` → used by Bangtinh!E173, Bangtinh!E26, Data!B61, Data!F51
+- `Nhập liệu!F41` → used by Bangtinh!E27, Data!F52
+- `Nhập liệu!F43` → used by Bangtinh!E176, Bangtinh!E25, Data!B62, Data!F54
+- `Nhập liệu!F44` → used by Bangtinh!E177, Bangtinh!E26, Data!B63, Data!F55
+- `Nhập liệu!F45` → used by Data!F56
+- `Nhập liệu!F52` → used by Data!A56, Data!F60
+- `Nhập liệu!F54` → used by Data!A77, Data!F62
+- `Nhập liệu!F6` → used by Data!B16, Data!B25, Data!B40
+- `Nhập liệu!F60` → used by Bangtinh!B17
+- `Nhập liệu!F61` → used by Bangtinh!B18
+- `Nhập liệu!F62` → used by Bangtinh!B19
+- `Nhập liệu!F63` → used by Bangtinh!B20
+- `Nhập liệu!F78` → used by Data!C83
+- `Nhập liệu!F79` → used by Data!C84
+- `Nhập liệu!F80` → used by Data!B116, Data!C85
+- `Nhập liệu!F81` → used by Data!C86
+- `Nhập liệu!F82` → used by Data!B118, Data!C87
+- `Nhập liệu!F83` → used by Data!B125, Data!B88
+- `Nhập liệu!F84` → used by Data!B126, Data!B89
+- `Nhập liệu!F85` → used by Data!B128, Data!B91
+- `Nhập liệu!F94` → used by Data!A134, Data!I88
+- `Nhập liệu!F95` → used by Data!A135, Data!I89
+- `Nhập liệu!G15` → used by Data!A65, Data!B42, Offical!E15
+- `Nhập liệu!G24` → used by Sheet1!G91, Sheet1!K31, Sheet1!K32, Sheet1!K33
+- `Nhập liệu!G25` → used by Sheet1!G92, Sheet1!K31, Sheet1!K32, Sheet1!K33
+- `Nhập liệu!G28` → used by Data!A66, Data!B46, Sheet1!A162
+- `Nhập liệu!G79` → used by Data!C115
+- `Nhập liệu!G80` → used by Data!C116
+- `Nhập liệu!G81` → used by Data!C117
+- `Nhập liệu!G82` → used by Data!C118
+- `Nhập liệu!G83` → used by Data!A125, Data!C88
+- `Nhập liệu!G84` → used by Data!A126, Data!C89
+- `Nhập liệu!G85` → used by Data!A128, Data!C91
+- `Nhập liệu!G88` → used by Data!F88
+- `Nhập liệu!G89` → used by Data!F89
+- `Nhập liệu!G90` → used by Data!F90
+- `Nhập liệu!G91` → used by Data!F91
+- `Nhập liệu!G92` → used by Data!F92
+- `Nhập liệu!H23` → used by Sheet1!A72, Sheet1!H30, Sheet1!H31, Sheet1!I30, Sheet1!I31, Sheet1!I40…
+- `Nhập liệu!H24` → used by Sheet1!G51, Sheet1!G61, Sheet1!G62, Sheet1!G63, Sheet1!G66, Sheet1!G81…
+- `Nhập liệu!H25` → used by Sheet1!G71, Sheet1!G86, Sheet1!H71, Sheet1!H86, Sheet1!I71, Sheet1!I81…
+- `Nhập liệu!H27` → used by Data!C69, Data!E69
+- `Nhập liệu!H30` → used by Data!A67
+- `Nhập liệu!H38` → used by Data!C59, Data!G49
+- `Nhập liệu!H39` → used by Data!C60, Data!G50
+- `Nhập liệu!H40` → used by Data!C61, Data!G51
+- `Nhập liệu!H42` → used by Data!G53
+- `Nhập liệu!H43` → used by Data!C62, Data!G54
+- `Nhập liệu!H44` → used by Data!C63, Data!G55
+- `Nhập liệu!H50` → used by Data!A54, Data!E63
+- `Nhập liệu!H55` → used by Data!A78, Data!F63
+- `Nhập liệu!H56` → used by Data!A79, Data!F64
+- `Nhập liệu!H57` → used by Data!A80, Data!F65
+- `Nhập liệu!H58` → used by Data!A81, Data!F66
+- `Nhập liệu!H79` → used by Data!D115
+- `Nhập liệu!H80` → used by Data!D116
+- `Nhập liệu!H81` → used by Data!D117
+- `Nhập liệu!H82` → used by Data!D118
+- `Nhập liệu!I18` → used by Data!A16
+- `Nhập liệu!I20` → used by Data!A16
+- `Nhập liệu!I32` → used by Bangtinh!E30, Data!A105, Data!C50
+- `Nhập liệu!I33` → used by Bangtinh!E31, Data!A106, Data!C51
+- `Nhập liệu!I37` → used by Data!H48
+- `Nhập liệu!I38` → used by Data!H49
+- `Nhập liệu!I39` → used by Data!H50
+- `Nhập liệu!I40` → used by Data!H51
+- `Nhập liệu!I41` → used by Data!H52
+- `Nhập liệu!I42` → used by Data!H53
+- `Nhập liệu!I43` → used by Data!H54
+- `Nhập liệu!I44` → used by Data!H55
+- `Nhập liệu!I79` → used by Bangtinh!E156, Data!D84
+- `Nhập liệu!I81` → used by Data!D86
+- `Nhập liệu!K23` → used by Data!A68, Offical!E10, Sheet1!H30, Sheet1!H31, Sheet1!H32, Sheet1!H33…
+- `Nhập liệu!K24` → used by Sheet1!G51, Sheet1!G52, Sheet1!G53, Sheet1!G54, Sheet1!G55, Sheet1!G56…
+- `Nhập liệu!K25` → used by Sheet1!G71, Sheet1!G72, Sheet1!G73, Sheet1!G74, Sheet1!G75, Sheet1!G76…
+- `Nhập liệu!K26` → used by Data!A71, Sheet1!G93, Sheet1!J54
+- `Nhập liệu!K27` → used by Sheet1!J55
+- `Nhập liệu!K28` → used by Data!C45, Sheet1!J56
+- `Nhập liệu!K38` → used by Data!D59
+- `Nhập liệu!K39` → used by Data!D60
+- `Nhập liệu!K40` → used by Data!D61
+- `Nhập liệu!K43` → used by Data!D62
+- `Nhập liệu!K44` → used by Data!D63
+- `Nhập liệu!K80` → used by Data!E116
+- `Nhập liệu!K82` → used by Data!E118
+- `Nhập liệu!L24` → used by Sheet1!H55, Sheet1!H56
+- `Nhập liệu!L25` → used by Sheet1!H74, Sheet1!H75, Sheet1!H76
+- `Nhập liệu!M24` → used by Sheet1!I55, Sheet1!I56
+- `Nhập liệu!M25` → used by Sheet1!I74, Sheet1!I75, Sheet1!I76
+- `Phieu TTTT!B43` → used by Bangtinh!F13
+- `Phieu TTTT!B44` → used by Sheet1!H101, Sheet1!H102
+- `Phieu TTTT!B45` → used by Sheet1!G150
+- `Phieu TTTT!B46` → used by Sheet1!G151, Sheet1!V102, Sheet1!V104, Sheet1!V105
+- `Phieu TTTT!B47` → used by Sheet1!G152
+- `Phieu TTTT!B48` → used by Sheet1!F153
+- `Phieu TTTT!B49` → used by Bangtinh!F14
+- `Phieu TTTT!C44` → used by Sheet1!G112, Sheet1!G122, Sheet1!G123, Sheet1!G124, Sheet1!G127, Sheet1!H112…
+- `Phieu TTTT!C45` → used by Sheet1!H100
+- `Phieu TTTT!C46` → used by Sheet1!H110, Sheet1!V102, Sheet1!V104, Sheet1!V105
+- `Phieu TTTT!C47` → used by Sheet1!H130
+- `Phieu TTTT!C48` → used by Sheet1!G153
+- `Phieu TTTT!D31` → used by Bangtinh!F25
+- `Phieu TTTT!D32` → used by Bangtinh!F26
+- `Phieu TTTT!D45` → used by Sheet1!H101, Sheet1!H102, Sheet1!H103, Sheet1!H104, Sheet1!H105, Sheet1!H106…
+- `Phieu TTTT!D46` → used by Sheet1!G112, Sheet1!G113, Sheet1!G114, Sheet1!G115, Sheet1!G116, Sheet1!G117…
+- `Phieu TTTT!D47` → used by Sheet1!G132, Sheet1!G133, Sheet1!G134, Sheet1!G135, Sheet1!G136, Sheet1!G137…
+- `Phieu TTTT!D48` → used by Sheet1!G153
+- `Phieu TTTT!E44` → used by Sheet1!G132, Sheet1!G142, Sheet1!G143, Sheet1!G144, Sheet1!G147, Sheet1!H132…
+- `Phieu TTTT!E46` → used by Sheet1!G151, Sheet1!V102, Sheet1!V104, Sheet1!V105
+- `Phieu TTTT!E47` → used by Sheet1!G152
+- `Phieu TTTT!E5` → used by Offical!E33, Sheet1!A84, Sheet1!E156
+- `Phieu TTTT!E60` → used by Bangtinh!F17
+- `Phieu TTTT!E61` → used by Bangtinh!F18
+- `Phieu TTTT!E62` → used by Bangtinh!F19
+- `Phieu TTTT!E63` → used by Bangtinh!F20
+- `Phieu TTTT!E8` → used by Sheet1!A84, Sheet1!E156
+- `Phieu TTTT!G43` → used by Bangtinh!G13
+- `Phieu TTTT!G44` → used by Sheet1!H168, Sheet1!H169
+- `Phieu TTTT!G45` → used by Sheet1!G217
+- `Phieu TTTT!G46` → used by Sheet1!G218, Sheet1!V119, Sheet1!V120, Sheet1!V121
+- `Phieu TTTT!G47` → used by Sheet1!G219
+- `Phieu TTTT!G48` → used by Sheet1!F220
+- `Phieu TTTT!G49` → used by Bangtinh!G14
+- `Phieu TTTT!H44` → used by Sheet1!G179, Sheet1!G189, Sheet1!G190, Sheet1!G191, Sheet1!G194, Sheet1!H179…
+- `Phieu TTTT!H45` → used by Sheet1!H167
+- `Phieu TTTT!H46` → used by Sheet1!H177, Sheet1!V119, Sheet1!V120, Sheet1!V121
+- `Phieu TTTT!H47` → used by Sheet1!H197
+- `Phieu TTTT!H48` → used by Sheet1!G220
+- `Phieu TTTT!I31` → used by Bangtinh!G25
+- `Phieu TTTT!I32` → used by Bangtinh!G26
+- `Phieu TTTT!I45` → used by Sheet1!H168, Sheet1!H169, Sheet1!H170, Sheet1!H171, Sheet1!H172, Sheet1!H173…
+- `Phieu TTTT!I46` → used by Sheet1!G179, Sheet1!G180, Sheet1!G181, Sheet1!G182, Sheet1!G183, Sheet1!G184…
+- `Phieu TTTT!I47` → used by Sheet1!G199, Sheet1!G200, Sheet1!G201, Sheet1!G202, Sheet1!G203, Sheet1!G204…
+- `Phieu TTTT!I48` → used by Sheet1!G220
+- `Phieu TTTT!J44` → used by Sheet1!G199, Sheet1!G209, Sheet1!G210, Sheet1!G211, Sheet1!G214, Sheet1!H199…
+- `Phieu TTTT!J46` → used by Sheet1!G218, Sheet1!V119, Sheet1!V120, Sheet1!V121
+- `Phieu TTTT!J47` → used by Sheet1!G219
+- `Phieu TTTT!J5` → used by Offical!E54, Sheet1!A96, Sheet1!K156
+- `Phieu TTTT!J60` → used by Bangtinh!G17
+- `Phieu TTTT!J61` → used by Bangtinh!G18
+- `Phieu TTTT!J62` → used by Bangtinh!G19
+- `Phieu TTTT!J63` → used by Bangtinh!G20
+- `Phieu TTTT!J8` → used by Sheet1!A96, Sheet1!K156
+- `Phieu TTTT!L43` → used by Bangtinh!H13
+- `Phieu TTTT!L44` → used by Sheet1!H227, Sheet1!H228
+- `Phieu TTTT!L45` → used by Sheet1!G276
+- `Phieu TTTT!L46` → used by Sheet1!G277, Sheet1!V134, Sheet1!V135, Sheet1!V136
+- `Phieu TTTT!L47` → used by Sheet1!G278
+- `Phieu TTTT!L48` → used by Sheet1!F279
+- `Phieu TTTT!L49` → used by Bangtinh!H14
+- `Phieu TTTT!M44` → used by Sheet1!G238, Sheet1!G248, Sheet1!G249, Sheet1!G250, Sheet1!G253, Sheet1!H238…
+- `Phieu TTTT!M45` → used by Sheet1!H226
+- `Phieu TTTT!M46` → used by Sheet1!H236, Sheet1!V134, Sheet1!V135, Sheet1!V136
+- `Phieu TTTT!M47` → used by Sheet1!H256
+- `Phieu TTTT!M48` → used by Sheet1!G279
+- `Phieu TTTT!N31` → used by Bangtinh!H25
+- `Phieu TTTT!N32` → used by Bangtinh!H26
+- `Phieu TTTT!N45` → used by Sheet1!H227, Sheet1!H228, Sheet1!H229, Sheet1!H230, Sheet1!H231, Sheet1!H232…
+- `Phieu TTTT!N46` → used by Sheet1!G238, Sheet1!G239, Sheet1!G240, Sheet1!G241, Sheet1!G242, Sheet1!G243…
+- `Phieu TTTT!N47` → used by Sheet1!G258, Sheet1!G259, Sheet1!G260, Sheet1!G261, Sheet1!G262, Sheet1!G263…
+- `Phieu TTTT!N48` → used by Sheet1!G279
+- `Phieu TTTT!O10` → used by Offical!E79, Sheet1!A109, Sheet1!O156
+- `Phieu TTTT!O13` → used by Offical!E81, Sheet1!C52
+- `Phieu TTTT!O44` → used by Sheet1!G258, Sheet1!G268, Sheet1!G269, Sheet1!G270, Sheet1!G273, Sheet1!H258…
+- `Phieu TTTT!O46` → used by Sheet1!G277, Sheet1!V134, Sheet1!V135, Sheet1!V136
+- `Phieu TTTT!O47` → used by Sheet1!G278
+- `Phieu TTTT!O5` → used by Offical!E75, Sheet1!A109, Sheet1!O156
+- `Phieu TTTT!O6` → used by Offical!E76, Sheet1!A109, Sheet1!O156
+- `Phieu TTTT!O60` → used by Bangtinh!H17
+- `Phieu TTTT!O61` → used by Bangtinh!H18
+- `Phieu TTTT!O62` → used by Bangtinh!H19
+- `Phieu TTTT!O63` → used by Bangtinh!H20
+- `Phieu TTTT!O7` → used by Offical!E77, Sheet1!A109, Sheet1!O156
+- `Phieu TTTT!O8` → used by Sheet1!A109, Sheet1!O156
+- `Phieu TTTT!O9` → used by Offical!E78, Sheet1!A109, Sheet1!O156

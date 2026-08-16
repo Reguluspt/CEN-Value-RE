@@ -1,6 +1,8 @@
 # CENVALUE MANAGER REAL ESTATE — DESIGN BOOK v0.1
-**Status:** DRAFT / DESIGN-CLOSURE
-**Source:** Brainstorm History & Decision Log
+**Status:** CURRENT INDEX — GATE B FROZEN/CLOSED; EPIC 0 READY FOR IMPLEMENTATION
+**Source:** Current Design Book + Gate B Closure + Epic 0 Design Freeze/PR Plan
+
+> **Authority note (2026-08-16):** The chapter labels below preserve their historical review state. They must not be used to reopen decisions already frozen by the latest Gate B closure, Decision Revisions, audit correctives, or Epic 0 packet. Current authority order: Project Owner decision → latest Gate/Design Freeze → current Design Book → specialized Gate-B contract → Brainstorm History for provenance.
 
 ## Status
 FROZEN = đủ khóa cho planning; REVIEWED = hướng đã thống nhất, còn chi tiết; DRAFT = còn design gap; OPEN = chưa được coding tự quyết.

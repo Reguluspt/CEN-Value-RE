@@ -1,0 +1,82 @@
+{
+  "fixture_id": "N08-0038-v0.1",
+  "source_workbook": "N08-0038_Huedtl_MTN_TranNguyenVanDau_UNLOCKED.xlsx",
+  "case": {
+    "appraisal_date_excel_raw": "46239",
+    "bank_or_profile_selector": "BIDV "
+  },
+  "subject": {
+    "current_address": "Số 05 Nguyễn Văn Đậu, phường 5, quận Phú Nhuận, Tp.HCM (nay là phường Đức Nhuận, Tp.HCM)",
+    "province": "Tp. HCM",
+    "district": "quận Phú Nhuận",
+    "commune": "phường 05",
+    "street": "Nguyễn Văn Đậu",
+    "house_number": "Số 05",
+    "lat": "10.804423",
+    "lng": "106.686861",
+    "parcel_number": "24",
+    "map_sheet": "29/BĐĐC",
+    "area_total": "103.2",
+    "area_residential_compliant": "82.93",
+    "area_residential_noncompliant": "20.27",
+    "frontage": "3.9",
+    "depth": "27.33",
+    "shape": "Tương đối vuông vức",
+    "construction": {
+      "type": "Nhà phố",
+      "floors": "3 tầng + sân thượng",
+      "year_built": "2008",
+      "structure": "Tường gạch, sàn BTCT, mái BTCT",
+      "gross_floor_area": "253.4",
+      "compliant_floor_area": "253.4"
+    }
+  },
+  "comparables": [
+    {
+      "asking_price": "21500000000",
+      "negotiated_price": "18280000000",
+      "transaction_success_factor": "0.85",
+      "area": "68.3",
+      "frontage": "3.55",
+      "depth": "19.350000000000001",
+      "shape": "Tương đối vuông vức",
+      "building_area": "327.58999999999997",
+      "building_remaining_quality": "0.75"
+    },
+    {
+      "asking_price": "88000000000",
+      "negotiated_price": "74800000000",
+      "transaction_success_factor": "0.85",
+      "area": "299",
+      "frontage": "15",
+      "depth": "20",
+      "shape": "Không vuông vức",
+      "building_area": "569",
+      "building_remaining_quality": "0.8"
+    },
+    {
+      "asking_price": "38000000000",
+      "negotiated_price": "32300000000",
+      "transaction_success_factor": "0.85",
+      "area": "149",
+      "frontage": "6.1",
+      "depth": "25.5",
+      "shape": "Không vuông vức",
+      "building_area": "420",
+      "building_remaining_quality": "0.75"
+    }
+  ],
+  "expected": {
+    "indicated_prices": [
+      "196308350",
+      "227083250",
+      "212201640"
+    ],
+    "selected_indication": "196308350",
+    "rounded_indication": "196308000",
+    "construction_total": "1152970000",
+    "land_total": "18428442440",
+    "total_before_rounding": "19581412440",
+    "final_rounded_value": "19581000000"
+  }
+}
