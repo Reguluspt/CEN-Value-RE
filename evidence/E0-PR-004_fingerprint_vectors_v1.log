@@ -1,0 +1,7 @@
+profile_id=cenvalue-re-n08-0038-v1
+exemplar_status=MATCHED
+exemplar_warnings=EXTERNAL_LINK_STATE_WARNING
+sheet_digest=5ee6ba3c64b9d29a5d064a051324cc5075dd7515a234d2daae90e8953964a4cc
+formula_digest=0ad19b1d66dad2f874b2a1312a1eadaeed9520872aebbf20105e9b8fe190564f
+mutation_status=UNSUPPORTED_TEMPLATE
+mutation_errors=FORMULA_SIGNATURE_MISMATCH
