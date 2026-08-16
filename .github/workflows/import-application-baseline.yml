@@ -165,7 +165,7 @@ jobs:
           test -f web/src/App.jsx
           test -d src/re
           test -d tests/re
-          test ! -d web/node_modules
+          test -z "$(git ls-files 'web/node_modules/**')"
           git diff --check
 
       - name: Commit imported baseline
