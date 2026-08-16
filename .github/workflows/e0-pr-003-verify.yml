@@ -92,11 +92,11 @@ jobs:
           cat > evidence/E0_PR_003_RUNTIME_EVIDENCE_v1.md <<EOF
           # E0-PR-003 — Decimal + RoundingPolicy Runtime Evidence v1
 
-          **Date:** 2026-08-16  
-          **Repository:** \`Reguluspt/CEN-Value-RE\`  
-          **Implementation baseline:** \`d89334c4c0ba5a666d4ce5556bc665d6e74750c0\`  
-          **Tested HEAD:** \`${TESTED_HEAD}\`  
-          **GitHub Actions run:** \`${GITHUB_RUN_ID}\`  
+          **Date:** 2026-08-16
+          **Repository:** \`Reguluspt/CEN-Value-RE\`
+          **Implementation baseline:** \`d89334c4c0ba5a666d4ce5556bc665d6e74750c0\`
+          **Tested HEAD:** \`${TESTED_HEAD}\`
+          **GitHub Actions run:** \`${GITHUB_RUN_ID}\`
           **Python:** 3.11
 
           ## Verification
