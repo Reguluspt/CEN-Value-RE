@@ -2,6 +2,7 @@ import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 
 const baseURL = process.env.E0_PR_002_BASE_URL || 'http://127.0.0.1:5173';
+const injectRootLeak = process.env.E0_PR_002_INJECT_ROOT_LEAK === '1';
 const browser = await chromium.launch({ headless: true });
 
 async function createTestPage(user) {
@@ -66,107 +67,167 @@ async function assertRedirectForUser(user, expectedPath, label) {
   }
 }
 
-await assertRedirectForUser(null, '/login', 'Unauthenticated user');
-await assertRedirectForUser(
-  { id: 2, username: 'guest', role: 'guest' },
-  '/sobo',
-  'Guest user'
-);
-
-const admin = await createTestPage({ id: 1, username: 'admin', role: 'admin' });
-const { context, page, pageErrors, consoleErrors } = admin;
-
-async function diagnostics(label) {
-  const bodyText = await page.locator('body').innerText().catch(() => '<body unavailable>');
-  console.error(`DIAGNOSTIC ${label}`);
-  console.error(`url=${page.url()}`);
-  console.error(`body=${bodyText.slice(0, 5000)}`);
-  console.error(`pageErrors=${JSON.stringify(pageErrors)}`);
-  console.error(`consoleErrors=${JSON.stringify(consoleErrors)}`);
-}
-
-async function waitForText(text, label) {
-  try {
-    await page.getByText(text, { exact: false }).first().waitFor({ state: 'visible', timeout: 15000 });
-    await page.waitForTimeout(250);
-  } catch (error) {
-    await diagnostics(label);
-    throw error;
-  }
-}
-
-async function firstGoto(path, text) {
-  await page.goto(`${baseURL}${path}`, { waitUntil: 'networkidle' });
-  await waitForText(text, `firstGoto:${path}`);
-}
-
-async function spaGoto(path, text) {
-  await page.evaluate((nextPath) => {
-    window.history.pushState({}, '', nextPath);
-    window.dispatchEvent(new PopStateEvent('popstate'));
-  }, path);
-  await waitForText(text, `spaGoto:${path}`);
-}
-
-async function currentStyleSnapshot(selector) {
+async function rootAndLegacySnapshot(page, selector) {
   return page.evaluate((sel) => {
-    const body = getComputedStyle(document.body);
-    const el = document.querySelector(sel);
-    const target = el ? getComputedStyle(el) : null;
+    const root = document.documentElement;
+    const rootStyle = getComputedStyle(root);
+    const bodyStyle = getComputedStyle(document.body);
+    const target = document.querySelector(sel);
+    const targetStyle = target ? getComputedStyle(target) : null;
+    const customProperties = {};
+
+    for (let index = 0; index < rootStyle.length; index += 1) {
+      const property = rootStyle.item(index);
+      if (property.startsWith('--')) {
+        customProperties[property] = rootStyle.getPropertyValue(property).trim();
+      }
+    }
+
     return {
-      bodyFontFamily: body.fontFamily,
-      bodyFontSize: body.fontSize,
-      bodyMargin: body.margin,
-      bodyBackground: body.backgroundColor,
-      targetFontFamily: target?.fontFamily ?? null,
-      targetFontSize: target?.fontSize ?? null,
-      targetColor: target?.color ?? null,
-      targetBorderRadius: target?.borderRadius ?? null,
+      rootAttributes: {
+        dataTheme: root.getAttribute('data-theme'),
+        dataAstryxTheme: root.getAttribute('data-astryx-theme'),
+      },
+      rootCustomProperties: Object.fromEntries(
+        Object.entries(customProperties).sort(([a], [b]) => a.localeCompare(b)),
+      ),
+      rootComputed: {
+        colorScheme: rootStyle.colorScheme,
+        fontFamily: rootStyle.fontFamily,
+        fontSize: rootStyle.fontSize,
+      },
+      bodyComputed: {
+        fontFamily: bodyStyle.fontFamily,
+        fontSize: bodyStyle.fontSize,
+        margin: bodyStyle.margin,
+        background: bodyStyle.backgroundColor,
+      },
+      targetComputed: {
+        fontFamily: targetStyle?.fontFamily ?? null,
+        fontSize: targetStyle?.fontSize ?? null,
+        color: targetStyle?.color ?? null,
+        borderRadius: targetStyle?.borderRadius ?? null,
+        background: targetStyle?.backgroundColor ?? null,
+      },
     };
   }, selector);
 }
 
+async function runAdminIsolationScenario(themeMode) {
+  const admin = await createTestPage({ id: 1, username: 'admin', role: 'admin' });
+  const { context, page, pageErrors, consoleErrors } = admin;
+
+  async function diagnostics(label) {
+    const bodyText = await page.locator('body').innerText().catch(() => '<body unavailable>');
+    console.error(`DIAGNOSTIC ${themeMode}:${label}`);
+    console.error(`url=${page.url()}`);
+    console.error(`body=${bodyText.slice(0, 5000)}`);
+    console.error(`pageErrors=${JSON.stringify(pageErrors)}`);
+    console.error(`consoleErrors=${JSON.stringify(consoleErrors)}`);
+  }
+
+  async function waitForText(text, label) {
+    try {
+      await page.getByText(text, { exact: false }).first().waitFor({ state: 'visible', timeout: 15000 });
+      await page.waitForTimeout(250);
+    } catch (error) {
+      await diagnostics(label);
+      throw error;
+    }
+  }
+
+  async function firstGoto(path, text) {
+    await page.goto(`${baseURL}${path}`, { waitUntil: 'networkidle' });
+    await waitForText(text, `firstGoto:${path}`);
+  }
+
+  async function spaGoto(path, text) {
+    await page.evaluate((nextPath) => {
+      window.history.pushState({}, '', nextPath);
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    }, path);
+    await waitForText(text, `spaGoto:${path}`);
+  }
+
+  try {
+    await firstGoto('/dashboard', 'Dashboard');
+    await page.evaluate((mode) => {
+      document.documentElement.setAttribute('data-theme', mode);
+    }, themeMode);
+    await page.waitForTimeout(50);
+
+    const dashboardBefore = await rootAndLegacySnapshot(page, 'h1');
+
+    await spaGoto('/cases', 'Quản lý hồ sơ');
+    const casesBefore = await rootAndLegacySnapshot(page, '.ant-card');
+
+    const baselinePageErrors = new Set(pageErrors);
+    const baselineConsoleErrors = new Set(consoleErrors);
+
+    if (injectRootLeak) {
+      await page.addStyleTag({
+        content: ':root { --border-width: 999px; --color-accent: rgb(1, 2, 3); }',
+      });
+    }
+
+    await spaGoto('/re', 'CenValue RE — Astryx integration spike');
+    const reSurface = page.locator('[data-re-astryx-spike="v1"]');
+    await reSurface.waitFor({ state: 'visible', timeout: 15000 });
+    assert.equal(await reSurface.locator('input').count(), 2);
+    assert.equal(await reSurface.getAttribute('data-theme'), themeMode, `RE surface must keep ${themeMode} theme local`);
+    assert.equal(await reSurface.getAttribute('data-astryx-theme'), 'neutral');
+
+    await spaGoto('/dashboard', 'Dashboard');
+    const dashboardAfter = await rootAndLegacySnapshot(page, 'h1');
+    await spaGoto('/cases', 'Quản lý hồ sơ');
+    const casesAfter = await rootAndLegacySnapshot(page, '.ant-card');
+
+    const newPageErrors = [...new Set(pageErrors)].filter(message => !baselinePageErrors.has(message));
+    const newConsoleErrors = [...new Set(consoleErrors)].filter(message => !baselineConsoleErrors.has(message));
+
+    assert.deepEqual(
+      dashboardAfter,
+      dashboardBefore,
+      `${themeMode}: document root/body/dashboard styles or custom properties changed after client-side /re visit`,
+    );
+    assert.deepEqual(
+      casesAfter,
+      casesBefore,
+      `${themeMode}: document root/body/cases styles or custom properties changed after client-side /re visit`,
+    );
+    assert.deepEqual(newPageErrors, [], `${themeMode}: new browser page errors after /re: ${newPageErrors.join(' | ')}`);
+    assert.deepEqual(newConsoleErrors, [], `${themeMode}: new browser console errors after /re: ${newConsoleErrors.join(' | ')}`);
+
+    return baselineConsoleErrors.size;
+  } catch (error) {
+    await diagnostics('fatal');
+    throw error;
+  } finally {
+    await context.close();
+  }
+}
+
 try {
-  await firstGoto('/dashboard', 'Dashboard');
-  const dashboardBefore = await currentStyleSnapshot('h1');
+  await assertRedirectForUser(null, '/login', 'Unauthenticated user');
+  await assertRedirectForUser(
+    { id: 2, username: 'guest', role: 'guest' },
+    '/sobo',
+    'Guest user'
+  );
 
-  await spaGoto('/cases', 'Quản lý hồ sơ');
-  const casesBefore = await currentStyleSnapshot('.ant-card');
-
-  const baselinePageErrors = new Set(pageErrors);
-  const baselineConsoleErrors = new Set(consoleErrors);
-
-  await spaGoto('/re', 'CenValue RE — Astryx integration spike');
-  await page.locator('[data-re-astryx-spike="v1"]').waitFor({ state: 'visible', timeout: 15000 });
-  assert.equal(await page.locator('[data-re-astryx-spike="v1"] input').count(), 2);
-
-  await spaGoto('/dashboard', 'Dashboard');
-  const dashboardAfter = await currentStyleSnapshot('h1');
-  await spaGoto('/cases', 'Quản lý hồ sơ');
-  const casesAfter = await currentStyleSnapshot('.ant-card');
-
-  const newPageErrors = [...new Set(pageErrors)].filter(message => !baselinePageErrors.has(message));
-  const newConsoleErrors = [...new Set(consoleErrors)].filter(message => !baselineConsoleErrors.has(message));
-
-  assert.deepEqual(dashboardAfter, dashboardBefore, 'Dashboard computed styles changed after client-side visit to /re');
-  assert.deepEqual(casesAfter, casesBefore, 'Cases computed styles changed after client-side visit to /re');
-  assert.deepEqual(newPageErrors, [], 'New browser page errors after /re: ' + newPageErrors.join(' | '));
-  assert.deepEqual(newConsoleErrors, [], 'New browser console errors after /re: ' + newConsoleErrors.join(' | '));
+  const lightConsoleBaseline = await runAdminIsolationScenario('light');
+  const darkConsoleBaseline = await runAdminIsolationScenario('dark');
 
   console.log('E0-PR-002 browser smoke PASSED');
   console.log('- unauthenticated /re redirected to /login');
   console.log('- guest /re redirected to /sobo');
-  console.log('- /re rendered as mocked admin');
-  console.log('- two Astryx TextInput controls rendered');
-  console.log('- /dashboard computed styles unchanged after client-side /re visit');
-  console.log('- /cases computed styles unchanged after client-side /re visit');
-  console.log(`- legacy console error baseline: ${baselineConsoleErrors.size} unique message(s)`);
+  console.log('- /re rendered as mocked admin in light and dark environments');
+  console.log('- two Astryx TextInput controls rendered in both environments');
+  console.log('- documentElement attributes and every computed root custom property unchanged after client-side /re visit');
+  console.log('- /dashboard and /cases representative computed styles unchanged in light and dark environments');
+  console.log(`- legacy console error baselines: light=${lightConsoleBaseline}, dark=${darkConsoleBaseline} unique message(s)`);
   console.log('- new browser page errors after /re: 0');
   console.log('- new browser console errors after /re: 0');
-} catch (error) {
-  await diagnostics('fatal');
-  throw error;
 } finally {
-  await context.close();
   await browser.close();
 }
