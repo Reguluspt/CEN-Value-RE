@@ -9,6 +9,7 @@ import {
 
 const webRoot = process.cwd();
 const read = (relative) => fs.readFileSync(path.join(webRoot, relative), 'utf8');
+const stripCssComments = (source) => source.replace(/\/\*[\s\S]*?\*\//g, '');
 const failures = [];
 const assert = (condition, message) => {
   if (!condition) failures.push(message);
@@ -19,6 +20,7 @@ const pkg = JSON.parse(read('package.json'));
 const app = read('src/App.jsx');
 const shell = read('src/re/ReShell.jsx');
 const css = read('src/re/astryx.css');
+const cssRulesOnly = stripCssComments(css);
 const viteConfig = read('vite.config.js');
 
 assert(pkg.dependencies['@astryxdesign/core'] === '0.2.0', 'Astryx core must be pinned to 0.2.0');
@@ -50,10 +52,11 @@ const disallowedImports = importSources.filter((source) =>
 );
 assert(disallowedImports.length === 0, `RE shell has non-Astryx/application imports: ${disallowedImports.join(', ')}`);
 
-assert(!css.includes("@import '@astryxdesign/core/reset.css'"), 'Global Astryx reset must not be imported in isolated spike');
-assert(css.includes('.cenvalue-re-surface'), 'Compatibility reset must be scoped to .cenvalue-re-surface');
-assert(!css.includes(':root'), 'Local RE CSS must not override global :root');
-assert(!/^body\s*\{/m.test(css), 'Local RE CSS must not override global body');
+assert(!cssRulesOnly.includes("@import '@astryxdesign/core/reset.css'"), 'Global Astryx reset must not be imported in isolated spike');
+assert(cssRulesOnly.includes('.cenvalue-re-surface'), 'Compatibility reset must be scoped to .cenvalue-re-surface');
+assert(!cssRulesOnly.includes(':root'), 'Local RE CSS must not override global :root');
+assert(!/html\s*\[data-theme=/m.test(cssRulesOnly), 'Local RE CSS must not target global html[data-theme]');
+assert(!/(^|[{}])\s*body(?:\s|[.#:\[\]>+~])*\{/m.test(cssRulesOnly), 'Local RE CSS must not override global body');
 assert(viteConfig.includes('reAstryxCssContainmentPlugin'), 'Vite must install the RE Astryx CSS containment transform');
 assert(viteConfig.includes('scopeReAstryxVendorCss'), 'Vite must transform resolved Astryx vendor CSS before emission');
 
@@ -88,5 +91,6 @@ console.log('- exact Astryx dependency pins present');
 console.log('- /re route is protected, lazy-loaded, and outside legacy Layout');
 console.log('- AppShell + SideNav + FormLayout + TextInput present');
 console.log('- RE shell has no root Astryx Theme provider/documentElement sync path');
+console.log('- local RE CSS contains no global :root/html[data-theme]/body rule');
 console.log('- resolved Astryx vendor CSS globals are rewritten to .cenvalue-re-surface');
 console.log('- known raw vendor :root/html[data-theme] mutation is retained as a negative control and eliminated by the transform');
