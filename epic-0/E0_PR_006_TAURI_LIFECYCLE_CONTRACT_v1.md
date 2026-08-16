@@ -45,9 +45,12 @@ token. Missing, stale, invalid and revoked credentials are rejected.
 
 ## Health
 
-- `GET /api/re/health/live` is unauthenticated liveness but remains loopback-only
-  and returns no credential/session data.
-- `GET /api/re/health/session` is protected and confirms the current launch ID.
+- `GET /api/re/health/live` is credential-protected liveness and returns no
+  credential/session data.
+- `GET /api/re/health/session` is credential-protected and confirms the current
+  launch ID.
+- No RE HTTP route is anonymously accessible; loopback binding is not treated as
+  an authentication mechanism.
 
 There is no HTTP shutdown route. Tauri supervises process shutdown; the runtime
 revokes its launch session before closing the listener.

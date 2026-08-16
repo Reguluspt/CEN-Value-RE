@@ -48,11 +48,6 @@ def create_re_blueprint(session: LaunchSession) -> Blueprint:
                 403,
             )
 
-        # Liveness contains no session or business data. All other RE routes are
-        # credential-protected.
-        if request.endpoint == "cenvalue_re_local.live_health":
-            return None
-
         decision = session.authorize(
             launch_id=request.headers.get(LAUNCH_ID_HEADER),
             bearer_token=_bearer_token(),

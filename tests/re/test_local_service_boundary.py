@@ -97,11 +97,18 @@ def test_missing_invalid_stale_and_revoked_session_decisions() -> None:
     ) is SessionDecision.REVOKED
 
 
-def test_live_health_is_loopback_only_but_does_not_disclose_session_secret() -> None:
+def test_live_health_requires_current_session_and_does_not_disclose_secret() -> None:
     session, credential = LaunchSession.issue()
     client = create_local_service_app(session).test_client()
 
-    response = client.get("/api/re/health/live")
+    missing = client.get("/api/re/health/live")
+    assert missing.status_code == 401
+    assert _json(missing)["error"]["code"] == "RE_SESSION_REQUIRED"
+
+    response = client.get(
+        "/api/re/health/live",
+        headers=_auth_headers(credential.launch_id, credential.bearer_token),
+    )
     assert response.status_code == 200
     payload = _json(response)
     assert payload == {"service": "cenvalue-re", "status": "ok"}
@@ -109,6 +116,7 @@ def test_live_health_is_loopback_only_but_does_not_disclose_session_secret() -> 
 
     lan_response = client.get(
         "/api/re/health/live",
+        headers=_auth_headers(credential.launch_id, credential.bearer_token),
         environ_base={"REMOTE_ADDR": "192.168.1.50"},
     )
     assert lan_response.status_code == 403
@@ -193,7 +201,11 @@ def test_live_runtime_binds_loopback_ephemeral_port_and_serves_protected_health(
         assert bootstrap.bearer_token not in repr(bootstrap)
         assert "bearer_token" not in bootstrap.public_metadata()
 
-        live = urlopen(f"{bootstrap.base_url}/api/re/health/live", timeout=3)
+        live_request = Request(
+            f"{bootstrap.base_url}/api/re/health/live",
+            headers=_auth_headers(bootstrap.launch_id, bootstrap.bearer_token),
+        )
+        live = urlopen(live_request, timeout=3)
         assert live.status == 200
 
         request = Request(

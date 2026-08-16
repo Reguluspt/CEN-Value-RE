@@ -10,7 +10,7 @@ from typing import Any
 
 from werkzeug.serving import make_server
 
-from .bootstrap import LaunchCredential, LaunchSession
+from .bootstrap import LaunchSession
 from .flask_app import create_local_service_app
 
 
@@ -71,7 +71,6 @@ class LocalServiceRuntime:
     __slots__ = (
         "_config",
         "_session",
-        "_credential",
         "_server",
         "_thread",
         "_state",
@@ -80,7 +79,6 @@ class LocalServiceRuntime:
     def __init__(self, config: LocalServiceConfig | None = None) -> None:
         self._config = config or LocalServiceConfig()
         self._session: LaunchSession | None = None
-        self._credential: LaunchCredential | None = None
         self._server: Any | None = None
         self._thread: Thread | None = None
         self._state = LocalServiceState.NEW
@@ -109,7 +107,6 @@ class LocalServiceRuntime:
         )
 
         self._session = session
-        self._credential = credential
         self._server = server
         self._thread = thread
         self._state = LocalServiceState.RUNNING
