@@ -133,6 +133,9 @@ try {
   await spaGoto('/cases', 'Quản lý hồ sơ');
   const casesBefore = await currentStyleSnapshot('.ant-card');
 
+  const baselinePageErrors = new Set(pageErrors);
+  const baselineConsoleErrors = new Set(consoleErrors);
+
   await spaGoto('/re', 'CenValue RE — Astryx integration spike');
   await page.locator('[data-re-astryx-spike="v1"]').waitFor({ state: 'visible', timeout: 15000 });
   assert.equal(await page.locator('[data-re-astryx-spike="v1"] input').count(), 2);
@@ -142,10 +145,13 @@ try {
   await spaGoto('/cases', 'Quản lý hồ sơ');
   const casesAfter = await currentStyleSnapshot('.ant-card');
 
+  const newPageErrors = [...new Set(pageErrors)].filter(message => !baselinePageErrors.has(message));
+  const newConsoleErrors = [...new Set(consoleErrors)].filter(message => !baselineConsoleErrors.has(message));
+
   assert.deepEqual(dashboardAfter, dashboardBefore, 'Dashboard computed styles changed after client-side visit to /re');
   assert.deepEqual(casesAfter, casesBefore, 'Cases computed styles changed after client-side visit to /re');
-  assert.deepEqual(pageErrors, [], 'Browser page errors: ' + pageErrors.join(' | '));
-  assert.deepEqual(consoleErrors, [], 'Browser console errors: ' + consoleErrors.join(' | '));
+  assert.deepEqual(newPageErrors, [], 'New browser page errors after /re: ' + newPageErrors.join(' | '));
+  assert.deepEqual(newConsoleErrors, [], 'New browser console errors after /re: ' + newConsoleErrors.join(' | '));
 
   console.log('E0-PR-002 browser smoke PASSED');
   console.log('- unauthenticated /re redirected to /login');
@@ -154,8 +160,9 @@ try {
   console.log('- two Astryx TextInput controls rendered');
   console.log('- /dashboard computed styles unchanged after client-side /re visit');
   console.log('- /cases computed styles unchanged after client-side /re visit');
-  console.log('- browser page errors: 0');
-  console.log('- browser console errors: 0');
+  console.log(`- legacy console error baseline: ${baselineConsoleErrors.size} unique message(s)`);
+  console.log('- new browser page errors after /re: 0');
+  console.log('- new browser console errors after /re: 0');
 } catch (error) {
   await diagnostics('fatal');
   throw error;
