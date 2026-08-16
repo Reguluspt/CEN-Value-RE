@@ -1,3 +1,4 @@
+# Harness revision 2: backend-only API interception
 name: E0-PR-002 runtime validation v3
 
 on:
