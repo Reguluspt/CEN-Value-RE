@@ -1,0 +1,14 @@
+database_name=cenvalue-re.db
+schema_version=1
+sqlcipher_version=4.12.0 community
+sqlite_plain_header=false
+sensitive_plaintext_visible=false
+master_key_visible_in_wrapped_file=false
+standard_sqlite_queryable=false
+wrong_key_rejected=true
+plain_sqlite_binding_rejected=true
+protected_key_reused=true
+repository_count=6
+legacy_hash_unchanged=true
+same_path_legacy_rejected=true
+dpapi_scope=CURRENT_USER
