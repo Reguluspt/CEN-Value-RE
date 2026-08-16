@@ -1,47 +1,44 @@
 # Initial Project Import Status
 
 **Source workspace:** ChatGPT Library `/CEN Value RE`  
-**Target:** `Reguluspt/CEN-Value-RE`  
+**Target repository:** `Reguluspt/CEN-Value-RE`  
 **Import branch:** `agent/initial-project-import`  
-**Mode:** Draft PR / integrity-first import
+**Mode:** Draft PR / review-first import
 
-## Snapshot scope
+## Repository scope
 
-The normalized project workspace contains **100 files** after duplicate removal, including Design Book, Gate A/B, Epic 0, corrective/evidence/fixtures/reports, implementation patches/payloads, sample PDFs, and the sample Excel workbook.
+The normalized Library snapshot contains 100 project files after duplicate removal. Project Owner has approved a GitHub scope that intentionally excludes reference/sample and packaged binary artifacts:
 
-## Repository baseline
+- `*.pdf` — sample GCN/reference documents;
+- `*.xlsx` — sample Excel workbook used for reverse-engineering and qualification;
+- `*.zip` — generated/packaged implementation archives whose reviewable patch/report/evidence remains version-controlled.
 
-`main` was initialized with a minimal README only so the first complete workspace import can be reviewed through a pull request rather than being written directly to the production baseline.
+Those assets remain in the canonical project Library and are not required for the GitHub baseline.
 
-## Import integrity rule
+## Version-controlled content
 
-Files are imported only when their bytes/content can be preserved reliably. No binary asset is silently converted, re-encoded, replaced with a placeholder, or claimed as uploaded when byte-for-byte transfer has not been verified.
+GitHub is intended to contain the reviewable/source-of-truth artifacts needed to continue engineering work, including:
 
-## Binary assets pending transport
+- Design Book;
+- Gate A / Gate B contracts and evidence;
+- Epic 0 packets;
+- corrective register and acceptance evidence;
+- canonical fixtures and mapping data;
+- implementation patches and reports;
+- text logs, hash manifests, and engineering reports.
 
-The current connector can create Git binary blobs from base64 but cannot accept a local file handle directly. Large base64 responses from the execution container may be truncated by the transport layer, so the following assets remain intentionally pending rather than risking corrupted Git objects:
-
-- `(Trunghd_HTG) N08-0038-Huedtl-MTNguyenVanDau-P5-PhuNhuan-htg.xlsx`
-- `18635151-DANG XUAN THANH-THUA 120.pdf`
-- `9673988-LUU THI HOANG TS 141220.pdf`
-- `AK 570073.pdf`
-- `E0-PR-001_SERVER_IMPLEMENTATION.zip`
-- `GCN IA DER.pdf`
-- `GCN PHA HUNG.pdf`
-- `P 069103.pdf`
-- `SỔ ĐỎ.pdf`
-- `TAI SAN BIA.pdf`
-- `TRAN THE CHAU - BIA DO.pdf`
-- `TRINH MINH DUC - BIA DO 1 (1).pdf`
-- `implementation/E0-PR-001_CORRECTED_IMPLEMENTATION_v1.zip`
-- `implementation/E0-PR-002_SERVER_PAYLOAD_v1.zip`
+`BRAINSTORM Full.md` is treated as a Library-only provenance archive rather than an implementation source of truth; current decisions must come from the latest handoff, Gate closure, Design Book, and specialized contracts.
 
 ## Current project stage
 
-- Gate B: FROZEN / CLOSED.
-- E0-PR-001: ACCEPTED after independent review.
-- E0-PR-002: server payload/static verification prepared; runtime build/browser evidence pending.
+- Gate B: **FROZEN / CLOSED**.
+- E0-PR-001: **ACCEPTED** after independent review.
+- E0-PR-002: implementation/static verification prepared; runtime build/browser acceptance evidence remains pending.
+
+## Integrity rule
+
+No excluded binary is replaced by a placeholder or transformed copy. If a binary artifact later becomes necessary for a release, reproducible test, or source-of-truth requirement, it must be introduced deliberately with an explicit repository policy change.
 
 ## Merge rule
 
-**Do not merge this PR while required workspace files are missing or integrity checks are incomplete.** The PR is intentionally a draft review surface for the first project import.
+The first import may be merged when the intended version-controlled file set is present, the PR diff is reviewed, and no unintended binary artifacts are included.
