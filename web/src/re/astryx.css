@@ -1,0 +1,56 @@
+/*
+ * E0-PR-002 isolation rule:
+ * Do NOT import @astryxdesign/core/reset.css here. Astryx's reset is global and
+ * would alter legacy Ant Design / application surfaces after the /re chunk is
+ * loaded. The spike loads only Astryx component CSS + Neutral theme CSS and
+ * supplies a minimal reset scoped to the CenValue RE surface.
+ */
+@import '@astryxdesign/core/astryx.css';
+@import '@astryxdesign/theme-neutral/theme.css';
+
+.cenvalue-re-surface {
+  min-height: 100svh;
+  width: 100%;
+  color: var(--color-text-primary);
+  background: var(--color-background-body);
+  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.cenvalue-re-surface :where(*, *::before, *::after) {
+  box-sizing: border-box;
+}
+
+.cenvalue-re-surface :where(button, input, optgroup, select, textarea) {
+  margin: 0;
+  font: inherit;
+  color: inherit;
+}
+
+.cenvalue-re-surface :where(h1, h2, h3, h4, h5, h6, p) {
+  margin: 0;
+}
+
+.cenvalue-re-spike-content {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  width: min(760px, 100%);
+  margin: 0 auto;
+  padding: 32px;
+}
+
+.cenvalue-re-spike-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cenvalue-re-spike-form {
+  width: 100%;
+  padding: 24px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-container);
+  background: var(--color-background-surface);
+}

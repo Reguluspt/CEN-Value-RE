@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './hooks/useAuth';
 import Layout from './components/Layout';
@@ -12,6 +13,8 @@ import Sobo from './pages/Sobo';
 import Directories from './pages/Directories';
 import Templates from './pages/Templates';
 import Settings from './pages/Settings';
+
+const ReShell = lazy(() => import('./re/ReShell'));
 
 // Helper component to redirect root path "/" to dashboard or sobo based on user role
 function RootRedirect() {
@@ -141,6 +144,18 @@ function App() {
               <Layout>
                 <Settings />
               </Layout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Isolated CenValue RE / Astryx spike */}
+        <Route
+          path="/re"
+          element={
+            <ProtectedRoute adminOnly={true}>
+              <Suspense fallback={<div>Đang tải CenValue RE...</div>}>
+                <ReShell />
+              </Suspense>
             </ProtectedRoute>
           }
         />
