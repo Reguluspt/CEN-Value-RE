@@ -13,7 +13,7 @@ page.on('console', message => {
   if (message.type() === 'error') consoleErrors.push(message.text());
 });
 
-await page.route('**/api/**', async route => {
+await page.route(`${baseURL}/api/**`, async route => {
   const path = new URL(route.request().url()).pathname;
   let body = {};
   if (path === '/api/auth/me') {
