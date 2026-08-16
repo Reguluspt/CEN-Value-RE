@@ -3,6 +3,7 @@ const CORE_SUFFIX = '/@astryxdesign/core/dist/astryx.css';
 const THEME_SUFFIX = '/@astryxdesign/theme-neutral/dist/theme.css';
 
 const normalizeId = (id) => id.split('?')[0].replaceAll('\\', '/');
+const stripCssComments = (css) => css.replace(/\/\*[\s\S]*?\*\//g, '');
 
 export function isReAstryxVendorCss(id) {
   const normalized = normalizeId(id);
@@ -10,12 +11,13 @@ export function isReAstryxVendorCss(id) {
 }
 
 function assertNoForbiddenGlobalSelectors(css, label) {
+  const rulesOnly = stripCssComments(css);
   const failures = [];
-  if (css.includes(':root')) failures.push(':root');
-  if (/html\s*\[data-theme=(?:"|')(?:light|dark)(?:"|')\]/.test(css)) {
+  if (rulesOnly.includes(':root')) failures.push(':root');
+  if (/html\s*\[data-theme=(?:"|')(?:light|dark)(?:"|')\]/.test(rulesOnly)) {
     failures.push('html[data-theme]');
   }
-  if (/(^|[{}])\s*body(?:\s|[.#:\[\]>+~])*\{/m.test(css)) failures.push('body');
+  if (/(^|[{}])\s*body(?:\s|[.#:\[\]>+~])*\{/m.test(rulesOnly)) failures.push('body');
   if (failures.length) {
     throw new Error(`${label} still contains forbidden global selector(s): ${failures.join(', ')}`);
   }
@@ -73,7 +75,7 @@ export function scopeReAstryxVendorCss(css, id) {
 
 export function assertReAstryxCssContained(css, label = 'Astryx CSS') {
   assertNoForbiddenGlobalSelectors(css, label);
-  if (!css.includes(RE_SCOPE)) {
+  if (!stripCssComments(css).includes(RE_SCOPE)) {
     throw new Error(`${label} does not contain the required ${RE_SCOPE} containment selector`);
   }
 }
