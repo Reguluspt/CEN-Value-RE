@@ -101,8 +101,8 @@ def _semantic_sha_from_snapshot(snapshot):
 def test_schema_v3_creates_authoritative_source_state_and_identity_guards():
     connection = _connection()
     try:
-        assert apply_migrations(connection) == 3
-        assert LATEST_SCHEMA_VERSION == 3
+        assert apply_migrations(connection) == LATEST_SCHEMA_VERSION
+        assert LATEST_SCHEMA_VERSION >= 3
         names = {
             row["name"]
             for row in connection.execute(
