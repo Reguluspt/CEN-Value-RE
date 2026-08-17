@@ -1,0 +1,184 @@
+name: E0-PR-008 Excel Qualification verification
+
+on:
+  push:
+    branches: [agent/e0-pr-008-excel-qualification]
+    paths: [.github/workflows/e0-pr-008-verify.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/e0-pr-008-excel-qualification
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11.9'
+
+      - name: Capture exact tested head
+        shell: bash
+        run: echo "TESTED_HEAD=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Install Epic 0 dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-re.txt pytest
+          python - <<'PY'
+          import flask, sys
+          import win32com.client
+          print('python=' + sys.version.split()[0])
+          print('flask=' + flask.__version__ if hasattr(flask, '__version__') else 'flask=3.1.1')
+          print('pywin32_import=true')
+          PY
+
+      - name: Compile and bounded-scope guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m compileall -q src/re tests/re/test_excel_qualification_harness.py
+          git diff --check 560e6dee34ceeaceb492eb4576f6081dff3e61f1..HEAD
+          python - <<'PY'
+          import subprocess
+          allowed = {
+              '.github/workflows/e0-pr-008-verify.yml',
+              'epic-0/E0_PR_008_EXCEL_QUALIFICATION_CONTRACT_v1.md',
+              'requirements-re.txt',
+              'src/re/ports/excel_qualification.py',
+              'src/re/application/services/excel_qualification.py',
+              'src/re/adapters/excel/com_runner.py',
+              'src/re/adapters/excel/qualification_cli.py',
+              'tests/re/test_excel_qualification_harness.py',
+          }
+          changed = set(subprocess.check_output([
+              'git','diff','--name-only','560e6dee34ceeaceb492eb4576f6081dff3e61f1..HEAD'
+          ], text=True).splitlines())
+          unexpected = sorted(changed - allowed)
+          if unexpected:
+              raise SystemExit('scope drift: ' + ', '.join(unexpected))
+          print('bounded_scope=true')
+          PY
+
+      - name: Run Epic 0 and E0-PR-008 tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pytest tests/re -q | tee e0pr008-tests.log
+
+      - name: Prove no-Excel is NOT_QUALIFIED
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf 'not-a-real-workbook' > e0pr008-dummy.xlsx
+          set +e
+          python -m src.re.adapters.excel.qualification_cli \
+            --workbook e0pr008-dummy.xlsx \
+            --profile-id cenvalue-re-n08-0038-v1 \
+            --profile-version 1 \
+            --manifest fixtures/GOLDEN_CASE_CHECKPOINT_MANIFEST_v1.json \
+            --report e0pr008-report.json
+          code=$?
+          set -e
+          if [ "$code" -ne 2 ]; then
+            echo "expected NOT_QUALIFIED exit 2, got $code"
+            cat e0pr008-report.json || true
+            exit 1
+          fi
+          python - <<'PY' | tee e0pr008-vector.log
+          import json
+          from hashlib import sha256
+          from pathlib import Path
+          from src.re.adapters.excel.com_runner import WindowsExcelCOMRunner
+
+          report = json.loads(Path('e0pr008-report.json').read_text(encoding='utf-8'))
+          probe = WindowsExcelCOMRunner().probe()
+          assert probe.available is False, 'hosted qualification runner unexpectedly has Excel Desktop'
+          assert probe.reason_code == 'EXCEL_APPLICATION_UNAVAILABLE'
+          assert report['status'] == 'NOT_QUALIFIED'
+          assert report['status'] != 'PASS'
+          assert report['actual_excel_evidence'] is False
+          assert report['full_recalculation_performed'] is False
+          assert report['opened_without_link_updates'] is False
+          assert report['profile_id'] == 'cenvalue-re-n08-0038-v1'
+          assert report['profile_version'] == '1'
+          assert report['manifest_id'] == 'N08-0038-checkpoints-v1'
+          assert report['manifest_version'] == 1
+          assert report['checkpoint_set_sha256'] == '48e991b8897498da192f0964ba6c198b0f26e9cc0f8f2b750b81ed1e8b4de2fb'
+          assert len(report['checkpoints']) == 31
+          assert all(row['passed'] is None for row in report['checkpoints'])
+          expected_hash = sha256(Path('e0pr008-dummy.xlsx').read_bytes()).hexdigest()
+          assert report['workbook_sha256'] == expected_hash
+          print('runner_platform=windows')
+          print('pywin32_available=true')
+          print('excel_desktop_available=false')
+          print('probe_reason_code=' + probe.reason_code)
+          print('qualification_status=' + report['status'])
+          print('actual_excel_evidence=false')
+          print('pass_without_excel=false')
+          print('profile_id=' + report['profile_id'])
+          print('profile_version=' + report['profile_version'])
+          print('manifest_id=' + report['manifest_id'])
+          print('manifest_version=' + str(report['manifest_version']))
+          print('checkpoint_count=' + str(len(report['checkpoints'])))
+          print('checkpoint_set_sha256=' + report['checkpoint_set_sha256'])
+          print('workbook_sha256=' + report['workbook_sha256'])
+          PY
+
+      - name: Write binding evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          cp e0pr008-tests.log evidence/E0-PR-008_tests_v1.log
+          cp e0pr008-vector.log evidence/E0-PR-008_no_excel_vectors_v1.log
+          cat > evidence/E0_PR_008_RUNTIME_EVIDENCE_v1.md <<EOF
+          # E0-PR-008 — Excel Qualification Harness Runtime Evidence v1
+
+          **Date:** 2026-08-17
+          **Repository:** \`Reguluspt/CEN-Value-RE\`
+          **Implementation baseline:** \`560e6dee34ceeaceb492eb4576f6081dff3e61f1\`
+          **Tested HEAD:** \`${TESTED_HEAD}\`
+          **GitHub Actions run:** \`${GITHUB_RUN_ID}\`
+          **Runner:** \`windows-latest\`
+          **Python:** \`3.11.9\`
+
+          ## Verification
+          - Windows qualification skeleton compile: PASS
+          - bounded scope / git diff check: PASS
+          - full \`tests/re\` foundation regressions: PASS
+          - E0-PR-008 focused tests: PASS
+          - pywin32 COM library import on Windows: PASS
+          - Microsoft Excel Desktop availability on hosted runner: UNAVAILABLE
+          - qualification CLI return code: \`2\` / \`NOT_QUALIFIED\`
+          - report status is not PASS: PASS
+          - \`actual_excel_evidence=false\`: PASS
+          - report retains profile id/version, workbook SHA-256, manifest id/version/checkpoint-set SHA and 31 ordered checkpoint IDs: PASS
+          - PASS constructor fail-closed without actual Excel/full-recalc/no-link-update/checkpoint evidence: PASS
+
+          ## Qualification
+          This is the required no-Excel fail-closed proof. It is **not** Microsoft Excel qualification PASS and does not claim GF-01/GF-02 end-to-end appraisal correctness.
+
+          ## Acceptance
+          Implementation evidence only. E0-PR-008 remains pending independent review/acceptance.
+          EOF
+
+      - name: Commit evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add evidence/E0_PR_008_RUNTIME_EVIDENCE_v1.md \
+            evidence/E0-PR-008_tests_v1.log \
+            evidence/E0-PR-008_no_excel_vectors_v1.log
+          git commit -m 'E0-PR-008: record Windows no-Excel evidence v1'
+          git push origin HEAD:agent/e0-pr-008-excel-qualification
