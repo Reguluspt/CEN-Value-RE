@@ -1,3 +1,4 @@
+# rerun after contract UTF-8/whitespace repair
 name: E0-PR-008 Excel Qualification verification
 
 on:
