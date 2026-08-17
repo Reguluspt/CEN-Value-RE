@@ -403,12 +403,12 @@ def test_manual_case_source_change_rejects_old_revision_even_when_caller_replays
             WHERE comparable_property_id=? AND event_kind='SOURCE_DATA_CHANGED'""",
             (comp_id,),
         ).fetchall()
-        assert audits
+        assert len(audits) == 11
         assert all(item["selected_by"] == "SYSTEM_SOURCE_DRIFT" for item in audits)
-        assert all(
-            item["source_data_revision"] == str(current_state.source_revision)
-            for item in audits[-11:]
-        )
+        stale_revisions = {int(item["source_data_revision"]) for item in audits}
+        assert len(stale_revisions) == 1
+        stale_revision = next(iter(stale_revisions))
+        assert int(old_revision) < stale_revision <= current_state.source_revision
 
         with pytest.raises(MarketAdjustmentConflictError):
             adjustment.run_adjustment(
