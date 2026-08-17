@@ -536,6 +536,146 @@ MIGRATIONS = (
             "CREATE INDEX ix_human_indication_source_adjustment ON human_indication_source(adjustment_snapshot_id)",
         ),
     ),
+    Migration(
+        5,
+        "epic1_land_final_valuation_composition",
+        (
+            """CREATE TABLE construction_aggregate_input (
+                id TEXT PRIMARY KEY,
+                case_id TEXT NOT NULL REFERENCES appraisal_case(id),
+                revision INTEGER NOT NULL CHECK (revision > 0),
+                amount_vnd TEXT NOT NULL,
+                evidence_ref TEXT NOT NULL CHECK (length(trim(evidence_ref)) > 0),
+                source_kind TEXT NOT NULL CHECK (source_kind='SUPPLIED_PRECOMPUTED'),
+                supplied_by TEXT NOT NULL CHECK (length(trim(supplied_by)) > 0),
+                supplied_at TEXT NOT NULL,
+                semantic_sha256 TEXT NOT NULL CHECK (length(trim(semantic_sha256)) > 0),
+                UNIQUE(case_id,revision)
+            )""",
+            """CREATE TRIGGER construction_aggregate_input_update_guard
+            BEFORE UPDATE ON construction_aggregate_input
+            BEGIN
+              SELECT RAISE(ABORT, 'construction aggregate input is immutable');
+            END""",
+            """CREATE TRIGGER construction_aggregate_input_delete_guard
+            BEFORE DELETE ON construction_aggregate_input
+            BEGIN
+              SELECT RAISE(ABORT, 'construction aggregate input is append-only');
+            END""",
+            """CREATE TABLE final_valuation_snapshot (
+                id TEXT PRIMARY KEY,
+                case_id TEXT NOT NULL REFERENCES appraisal_case(id),
+                subject_property_id TEXT NOT NULL REFERENCES subject_property(property_id),
+                appraisal_date TEXT NOT NULL,
+                human_indication_snapshot_id TEXT NOT NULL REFERENCES human_indication_snapshot(id),
+                human_indication_semantic_sha256 TEXT NOT NULL,
+                rounded_indicated_unit_price_vnd_per_m2 TEXT NOT NULL,
+                land_components_json TEXT NOT NULL,
+                land_components_sha256 TEXT NOT NULL,
+                compliant_residential_land_value_vnd TEXT NOT NULL,
+                other_recognized_land_value_vnd TEXT NOT NULL,
+                recognized_land_value_vnd TEXT NOT NULL,
+                construction_aggregate_input_id TEXT NOT NULL REFERENCES construction_aggregate_input(id),
+                construction_aggregate_semantic_sha256 TEXT NOT NULL,
+                construction_value_total_vnd TEXT NOT NULL,
+                total_value_before_rounding_vnd TEXT NOT NULL,
+                final_appraised_value_vnd TEXT NOT NULL,
+                rounding_target TEXT NOT NULL CHECK (rounding_target='TOTAL_VALUE'),
+                rounding_mode TEXT NOT NULL CHECK (rounding_mode='NEAREST'),
+                rounding_increment_vnd INTEGER CHECK (rounding_increment_vnd IS NULL OR rounding_increment_vnd > 0),
+                rounding_source TEXT NOT NULL CHECK (rounding_source IN ('TEMPLATE_DEFAULT','CASE_OVERRIDE','APPLICATION_DEFAULT')),
+                rounding_profile_id TEXT,
+                rounding_profile_version TEXT,
+                rounding_selected_by TEXT,
+                rounding_selected_at TEXT,
+                composed_at TEXT NOT NULL,
+                semantic_sha256 TEXT NOT NULL,
+                CHECK (
+                    (rounding_profile_id IS NULL AND rounding_profile_version IS NULL)
+                    OR
+                    (length(trim(rounding_profile_id)) > 0 AND length(trim(rounding_profile_version)) > 0)
+                ),
+                CHECK (
+                    (rounding_source='CASE_OVERRIDE'
+                     AND rounding_selected_by IS NOT NULL
+                     AND length(trim(rounding_selected_by)) > 0
+                     AND rounding_selected_at IS NOT NULL)
+                    OR
+                    (rounding_source!='CASE_OVERRIDE'
+                     AND rounding_selected_by IS NULL
+                     AND rounding_selected_at IS NULL)
+                )
+            )""",
+            """CREATE TRIGGER final_valuation_snapshot_lineage_guard
+            BEFORE INSERT ON final_valuation_snapshot
+            WHEN NEW.case_id != (
+                    SELECT case_id FROM property WHERE id=NEW.subject_property_id AND role='SUBJECT'
+                 )
+              OR NEW.case_id != (
+                    SELECT case_id FROM human_indication_snapshot WHERE id=NEW.human_indication_snapshot_id
+                 )
+              OR NEW.human_indication_semantic_sha256 != (
+                    SELECT semantic_sha256 FROM human_indication_snapshot WHERE id=NEW.human_indication_snapshot_id
+                 )
+              OR NEW.case_id != (
+                    SELECT case_id FROM construction_aggregate_input WHERE id=NEW.construction_aggregate_input_id
+                 )
+              OR NEW.construction_aggregate_semantic_sha256 != (
+                    SELECT semantic_sha256 FROM construction_aggregate_input WHERE id=NEW.construction_aggregate_input_id
+                 )
+            BEGIN
+              SELECT RAISE(ABORT, 'final valuation snapshot evidence lineage mismatch');
+            END""",
+            """CREATE TRIGGER final_valuation_snapshot_update_guard
+            BEFORE UPDATE ON final_valuation_snapshot
+            BEGIN
+              SELECT RAISE(ABORT, 'final valuation snapshot is immutable');
+            END""",
+            """CREATE TRIGGER final_valuation_snapshot_delete_guard
+            BEFORE DELETE ON final_valuation_snapshot
+            BEGIN
+              SELECT RAISE(ABORT, 'final valuation snapshot is append-only');
+            END""",
+            """CREATE TABLE final_valuation_land_source (
+                valuation_snapshot_id TEXT NOT NULL REFERENCES final_valuation_snapshot(id),
+                case_id TEXT NOT NULL REFERENCES appraisal_case(id),
+                subject_property_id TEXT NOT NULL REFERENCES subject_property(property_id),
+                land_component_id TEXT NOT NULL REFERENCES land_valuation_component(id),
+                component_semantic_sha256 TEXT NOT NULL,
+                PRIMARY KEY(valuation_snapshot_id,land_component_id)
+            )""",
+            """CREATE TRIGGER final_valuation_land_source_lineage_guard
+            BEFORE INSERT ON final_valuation_land_source
+            WHEN NEW.case_id != (
+                    SELECT case_id FROM final_valuation_snapshot WHERE id=NEW.valuation_snapshot_id
+                 )
+              OR NEW.subject_property_id != (
+                    SELECT subject_property_id FROM final_valuation_snapshot WHERE id=NEW.valuation_snapshot_id
+                 )
+              OR NEW.case_id != (
+                    SELECT case_id FROM property WHERE id=NEW.subject_property_id AND role='SUBJECT'
+                 )
+              OR NEW.subject_property_id != (
+                    SELECT property_id FROM land_valuation_component WHERE id=NEW.land_component_id
+                 )
+            BEGIN
+              SELECT RAISE(ABORT, 'final valuation land source lineage mismatch');
+            END""",
+            """CREATE TRIGGER final_valuation_land_source_update_guard
+            BEFORE UPDATE ON final_valuation_land_source
+            BEGIN
+              SELECT RAISE(ABORT, 'final valuation land source is immutable');
+            END""",
+            """CREATE TRIGGER final_valuation_land_source_delete_guard
+            BEFORE DELETE ON final_valuation_land_source
+            BEGIN
+              SELECT RAISE(ABORT, 'final valuation land source is append-only');
+            END""",
+            "CREATE INDEX ix_construction_aggregate_case ON construction_aggregate_input(case_id,revision,id)",
+            "CREATE INDEX ix_final_valuation_case ON final_valuation_snapshot(case_id,composed_at,id)",
+            "CREATE INDEX ix_final_valuation_human ON final_valuation_snapshot(human_indication_snapshot_id)",
+        ),
+    ),
 )
 
 LATEST_SCHEMA_VERSION = MIGRATIONS[-1].version
