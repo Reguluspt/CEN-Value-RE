@@ -210,6 +210,68 @@ MIGRATIONS = (
             "CREATE UNIQUE INDEX uq_property_case_role_subject ON property(case_id, role) WHERE role='SUBJECT' AND archived_at IS NULL",
         ),
     ),
+    Migration(
+        3,
+        "epic1_market_adjustment_evidence",
+        (
+            """CREATE TRIGGER adjustment_decision_lineage_insert_guard
+            BEFORE INSERT ON adjustment_decision
+            WHEN NEW.case_id != (SELECT case_id FROM comparable_property WHERE property_id=NEW.comparable_property_id)
+            BEGIN
+              SELECT RAISE(ABORT, 'adjustment decision case lineage mismatch');
+            END""",
+            """CREATE TRIGGER adjustment_decision_lineage_update_guard
+            BEFORE UPDATE OF case_id, comparable_property_id ON adjustment_decision
+            WHEN NEW.case_id != (SELECT case_id FROM comparable_property WHERE property_id=NEW.comparable_property_id)
+            BEGIN
+              SELECT RAISE(ABORT, 'adjustment decision case lineage mismatch');
+            END""",
+            """CREATE TABLE adjustment_selection_audit (
+                id TEXT PRIMARY KEY,
+                adjustment_decision_id TEXT NOT NULL REFERENCES adjustment_decision(id),
+                case_id TEXT NOT NULL REFERENCES appraisal_case(id),
+                comparable_property_id TEXT NOT NULL REFERENCES comparable_property(property_id),
+                factor_key TEXT NOT NULL,
+                event_kind TEXT NOT NULL CHECK (event_kind IN ('SELECTED','SOURCE_DATA_CHANGED')),
+                selected_rate_pct TEXT,
+                selected_explicitly INTEGER NOT NULL CHECK (selected_explicitly IN (0,1)),
+                selected_by TEXT NOT NULL CHECK (length(trim(selected_by)) > 0),
+                selected_at TEXT NOT NULL,
+                source_data_revision TEXT NOT NULL,
+                review_status TEXT NOT NULL
+            )""",
+            """CREATE TRIGGER adjustment_selection_audit_lineage_guard
+            BEFORE INSERT ON adjustment_selection_audit
+            WHEN NEW.case_id != (SELECT case_id FROM comparable_property WHERE property_id=NEW.comparable_property_id)
+              OR NEW.case_id != (SELECT case_id FROM adjustment_decision WHERE id=NEW.adjustment_decision_id)
+              OR NEW.comparable_property_id != (SELECT comparable_property_id FROM adjustment_decision WHERE id=NEW.adjustment_decision_id)
+              OR NEW.factor_key != (SELECT factor_key FROM adjustment_decision WHERE id=NEW.adjustment_decision_id)
+            BEGIN
+              SELECT RAISE(ABORT, 'adjustment selection audit lineage mismatch');
+            END""",
+            """CREATE TABLE adjustment_calculation_snapshot (
+                id TEXT PRIMARY KEY,
+                case_id TEXT NOT NULL REFERENCES appraisal_case(id),
+                comparable_property_id TEXT NOT NULL REFERENCES comparable_property(property_id),
+                source_data_revision TEXT NOT NULL,
+                normalized_base_price_vnd_per_m2 TEXT NOT NULL,
+                property_adjustment_base_vnd_per_m2 TEXT NOT NULL,
+                indicated_unit_price_vnd_per_m2 TEXT NOT NULL,
+                decision_set_sha256 TEXT NOT NULL,
+                ordered_steps_json TEXT NOT NULL,
+                semantic_sha256 TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )""",
+            """CREATE TRIGGER adjustment_snapshot_lineage_guard
+            BEFORE INSERT ON adjustment_calculation_snapshot
+            WHEN NEW.case_id != (SELECT case_id FROM comparable_property WHERE property_id=NEW.comparable_property_id)
+            BEGIN
+              SELECT RAISE(ABORT, 'adjustment calculation snapshot case lineage mismatch');
+            END""",
+            "CREATE INDEX ix_adjustment_audit_decision ON adjustment_selection_audit(adjustment_decision_id, selected_at, id)",
+            "CREATE INDEX ix_adjustment_snapshot_comparable ON adjustment_calculation_snapshot(case_id, comparable_property_id, created_at, id)",
+        ),
+    ),
 )
 
 LATEST_SCHEMA_VERSION = MIGRATIONS[-1].version
