@@ -22,6 +22,7 @@ from ...domain.valuation import (
     evaluate_15_percent_readiness,
 )
 from ...ports.adjustment_persistence import AdjustmentCalculationSnapshotRecord
+from ...ports.excel import TemplateRoundingDefaultResolver
 from ...ports.persistence import AdjustmentDecisionRecord
 from ...ports.valuation_persistence import (
     HumanIndicationSnapshotRecord,
@@ -257,10 +258,12 @@ class ComparableQualityService:
         self,
         uow: HumanIndicationUnitOfWork,
         *,
+        template_rounding_defaults: TemplateRoundingDefaultResolver | None = None,
         now: Callable[[], str] = _utc_now,
         new_id: Callable[[], str] = _new_id,
     ) -> None:
         self._uow = uow
+        self._template_rounding_defaults = template_rounding_defaults
         self._now = now
         self._new_id = new_id
 
@@ -531,6 +534,37 @@ class ComparableQualityService:
             if policy_profile != case_profile:
                 raise ComparableQualityConflictError(
                     "Template-default rounding policy does not match the case profile"
+                )
+            if self._template_rounding_defaults is None:
+                raise ComparableQualityConflictError(
+                    "Template-default rounding requires a trusted template-profile resolver"
+                )
+            trusted = self._template_rounding_defaults.resolve(
+                profile_id=case_profile[0],
+                profile_version=case_profile[1],
+                target=rounding_policy.target.key,
+            )
+            if trusted is None:
+                raise ComparableQualityConflictError(
+                    "Case template profile does not declare a trusted rounding default for this target"
+                )
+            trusted_policy = (
+                trusted.profile_id,
+                trusted.profile_version,
+                trusted.target,
+                trusted.mode,
+                trusted.increment_vnd,
+            )
+            supplied_policy = (
+                rounding_policy.profile_id,
+                rounding_policy.profile_version,
+                rounding_policy.target.key,
+                rounding_policy.mode.value,
+                rounding_policy.increment_vnd,
+            )
+            if supplied_policy != trusted_policy:
+                raise ComparableQualityConflictError(
+                    "Template-default rounding policy does not match the trusted profile default"
                 )
         elif rounding_policy.source is RoundingSource.APPLICATION_DEFAULT:
             if case_profile[0] is not None or case_profile[1] is not None:
