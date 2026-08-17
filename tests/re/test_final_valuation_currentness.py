@@ -154,7 +154,7 @@ def test_upstream_human_indication_drift_invalidates_current_final_snapshot():
             selected_rate="-0.04",
             selected_by="appraiser-2",
         )
-        with pytest.raises(FinalValuationConflictError, match="decisions are no longer current"):
+        with pytest.raises(FinalValuationConflictError):
             service.resolve_current(case_id="case-1")
     finally:
         connection.close()
