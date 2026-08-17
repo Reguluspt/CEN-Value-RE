@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from src.re.adapters.excel.com_runner import WindowsExcelCOMRunner
+from src.re.adapters.excel_qualification.com_runner import WindowsExcelCOMRunner
 from src.re.application.services.excel_qualification import (
     QualificationStatus,
     qualify_workbook,
