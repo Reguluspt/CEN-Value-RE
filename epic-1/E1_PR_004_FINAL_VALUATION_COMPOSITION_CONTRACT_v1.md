@@ -1,7 +1,7 @@
 # E1-PR-004 — Land + Final Valuation Composition Contract v1
 
-**Status:** IMPLEMENTATION CONTRACT — EPIC 1  
-**Baseline:** `eef0a9111f1977a49bad11ace2089d9c73ca5772`  
+**Status:** IMPLEMENTATION CONTRACT — EPIC 1
+**Baseline:** `eef0a9111f1977a49bad11ace2089d9c73ca5772`
 **Gate:** `FinalValuationCompositionGate`
 
 ## 1. Authority and boundary
