@@ -160,8 +160,8 @@ def _recompute_human_semantic_sha(snapshot, sources):
 def test_schema_v4_creates_append_only_human_indication_evidence():
     connection = _connection()
     try:
-        assert apply_migrations(connection) == 4
-        assert LATEST_SCHEMA_VERSION == 4
+        assert apply_migrations(connection) == LATEST_SCHEMA_VERSION
+        assert LATEST_SCHEMA_VERSION >= 4
         names = {
             row["name"]
             for row in connection.execute(
