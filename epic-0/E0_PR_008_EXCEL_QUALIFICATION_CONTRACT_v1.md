@@ -63,9 +63,9 @@ The application service must not import `win32com`, COM types, Excel APIs, or ad
 
 ## 5. Windows COM adapter
 
-`WindowsExcelCOMRunner` is adapter infrastructure.
+`src/re/adapters/excel_qualification/` owns workbook-runtime infrastructure. The existing `src/re/adapters/excel/` package remains profile/fingerprint-only and must not acquire workbook runtime dependencies.
 
-Target behavior:
+`WindowsExcelCOMRunner` target behavior:
 
 1. lazily load pywin32;
 2. create isolated `Excel.Application` through `DispatchEx`;
@@ -88,7 +88,7 @@ The runner must report unavailable rather than claiming PASS when:
 
 Command module:
 
-`python -m src.re.adapters.excel.qualification_cli`
+`python -m src.re.adapters.excel_qualification.qualification_cli`
 
 Required inputs:
 
