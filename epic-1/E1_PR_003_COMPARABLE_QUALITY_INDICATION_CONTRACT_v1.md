@@ -100,6 +100,10 @@ raw_selected_indication -> UNIT_PRICE RoundingPolicy -> rounded_indication
 
 For N08-0038 the frozen default is 1,000 VND/m². E1-PR-003 reuses the accepted `RoundingPolicy` domain primitive and does not duplicate rounding logic.
 
+`TEMPLATE_DEFAULT` is authoritative profile provenance, not a caller label. A template-default policy must be resolved or validated against the trusted `ExcelTemplateProfile` bound to the case. The supplied policy must exactly match the profile-declared profile ID/version, target, mode, and increment. A missing trusted declaration or any mismatch fails closed.
+
+For N08-0038 `UNIT_PRICE`, only `NEAREST` with increment `1,000 VND/m²` may carry `TEMPLATE_DEFAULT` provenance. `NONE`, `10,000 VND/m²`, or any other professional choice is not the N08 template default; when supported it must be represented as an explicit `CASE_OVERRIDE` with the required selection actor/time audit metadata.
+
 ## 8. Golden acceptance
 
 Using the provenance-complete Golden C1–C11 decision fixture, E1-PR-003 must reproduce:
