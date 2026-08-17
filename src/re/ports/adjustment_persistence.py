@@ -33,6 +33,7 @@ class AdjustmentCalculationSnapshotRecord:
     comparable_property_id: str
     source_data_revision: str
     normalized_base_price_vnd_per_m2: str
+    normalized_base_evidence_ref: str
     property_adjustment_base_vnd_per_m2: str
     indicated_unit_price_vnd_per_m2: str
     decision_set_sha256: str
