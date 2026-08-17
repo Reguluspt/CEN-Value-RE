@@ -1,0 +1,14 @@
+runner_platform=windows
+pywin32_available=true
+excel_desktop_available=false
+probe_reason_code=EXCEL_APPLICATION_UNAVAILABLE
+qualification_status=NOT_QUALIFIED
+actual_excel_evidence=false
+pass_without_excel=false
+profile_id=cenvalue-re-n08-0038-v1
+profile_version=1
+manifest_id=N08-0038-checkpoints-v1
+manifest_version=1
+checkpoint_count=31
+checkpoint_set_sha256=48e991b8897498da192f0964ba6c198b0f26e9cc0f8f2b750b81ed1e8b4de2fb
+workbook_sha256=c8975687aba624268d9be1b9b5fa302db39ff13babf2b43c325ae97cf96c51ea
