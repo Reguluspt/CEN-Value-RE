@@ -428,8 +428,9 @@ class FinalValuationService:
                     semantic_sha256=semantic_sha,
                 )
                 self._uow.final_valuation_snapshots.add(record)
+                included_ids = {item.component_id for item in composition.land_components}
                 for source in persisted_components:
-                    if source.id not in {item.component_id for item in composition.land_components}:
+                    if source.id not in included_ids:
                         continue
                     self._uow.final_valuation_land_sources.add(
                         FinalValuationLandSourceRecord(
@@ -463,6 +464,9 @@ class FinalValuationService:
         case_id = _require_text(case_id, "case_id")
         try:
             with self._uow.atomic():
+                case = self._uow.cases.get(case_id)
+                if case is None or case.archived_at is not None:
+                    raise FinalValuationNotFoundError("Appraisal case was not found")
                 human = self._resolve_current_human_indication(case_id)
                 subject = self._uow.subjects.get_for_case(case_id)
                 if subject is None or subject.archived_at is not None:
@@ -473,7 +477,8 @@ class FinalValuationService:
                     raise FinalValuationNotFoundError("No current final valuation exists")
                 latest = snapshots[-1]
                 if (
-                    latest.subject_property_id != subject.property_id
+                    latest.appraisal_date != case.appraisal_date
+                    or latest.subject_property_id != subject.property_id
                     or latest.human_indication_snapshot_id != human.id
                     or latest.human_indication_semantic_sha256 != human.semantic_sha256
                     or latest.construction_aggregate_input_id != construction.id
@@ -482,6 +487,7 @@ class FinalValuationService:
                     raise FinalValuationConflictError(
                         "Final valuation inputs changed; recomposition is required"
                     )
+                self._validate_snapshot_rounding_for_case(latest, case)
                 current_components = tuple(
                     item
                     for item in self._uow.land_valuation_components.list_for_property(
@@ -611,6 +617,46 @@ class FinalValuationService:
                 "Human indication semantic evidence hash does not verify"
             )
         return latest
+
+    def _validate_snapshot_rounding_for_case(self, snapshot, case) -> None:
+        case_profile = (case.template_profile_id, case.template_profile_version)
+        snapshot_profile = (snapshot.rounding_profile_id, snapshot.rounding_profile_version)
+        if snapshot.rounding_source == RoundingSource.TEMPLATE_DEFAULT.value:
+            if snapshot_profile != case_profile or case_profile[0] is None or case_profile[1] is None:
+                raise FinalValuationConflictError(
+                    "Final valuation template profile changed; recomposition is required"
+                )
+            if self._template_rounding_defaults is None:
+                raise FinalValuationConflictError(
+                    "Current final valuation requires the trusted template-profile resolver"
+                )
+            trusted = self._template_rounding_defaults.resolve(
+                profile_id=case_profile[0],
+                profile_version=case_profile[1],
+                target=TOTAL_VALUE_TARGET.key,
+            )
+            if trusted is None or (
+                snapshot.rounding_target,
+                snapshot.rounding_mode,
+                snapshot.rounding_increment_vnd,
+            ) != (
+                trusted.target,
+                trusted.mode,
+                trusted.increment_vnd,
+            ):
+                raise FinalValuationConflictError(
+                    "Final valuation template rounding policy changed; recomposition is required"
+                )
+        elif snapshot.rounding_source == RoundingSource.APPLICATION_DEFAULT.value:
+            if case_profile != (None, None) or snapshot_profile != (None, None):
+                raise FinalValuationConflictError(
+                    "Final valuation application-default policy is no longer current"
+                )
+        elif snapshot.rounding_source == RoundingSource.CASE_OVERRIDE.value:
+            if snapshot_profile != (None, None) and snapshot_profile != case_profile:
+                raise FinalValuationConflictError(
+                    "Final valuation case override profile metadata is no longer current"
+                )
 
     def _validate_rounding_policy_for_case(self, policy, case) -> None:
         case_profile = (case.template_profile_id, case.template_profile_version)
