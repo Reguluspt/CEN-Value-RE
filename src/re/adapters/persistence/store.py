@@ -12,6 +12,7 @@ from .adjustment_repositories import (
     SQLCipherAdjustmentDecisionQueryRepository,
     SQLCipherAdjustmentSelectionAuditRepository,
 )
+from .adjustment_source_repository import SQLCipherAdjustmentSourceStateRepository
 from .key_protection import KeyProtector, load_or_create_master_key
 from .migrations import apply_migrations
 from .repositories import (
@@ -60,6 +61,7 @@ class SQLCipherUnitOfWork:
         self.adjustment_decision_queries = SQLCipherAdjustmentDecisionQueryRepository(connection)
         self.adjustment_selection_audit = SQLCipherAdjustmentSelectionAuditRepository(connection)
         self.adjustment_calculation_snapshots = SQLCipherAdjustmentCalculationSnapshotRepository(connection)
+        self.adjustment_source_states = SQLCipherAdjustmentSourceStateRepository(connection)
         self.approval_submissions = SQLCipherApprovalSubmissionRepository(connection)
 
     @property
