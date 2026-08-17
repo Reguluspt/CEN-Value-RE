@@ -415,6 +415,109 @@ MIGRATIONS = (
             "CREATE INDEX ix_adjustment_snapshot_comparable ON adjustment_calculation_snapshot(case_id, comparable_property_id, created_at, id)",
         ),
     ),
+    Migration(
+        4,
+        "epic1_comparable_quality_human_indication",
+        (
+            """CREATE TABLE human_indication_snapshot (
+                id TEXT PRIMARY KEY,
+                case_id TEXT NOT NULL REFERENCES appraisal_case(id),
+                selection_kind TEXT NOT NULL CHECK (selection_kind IN ('COMPARABLE','ZERO_GROSS_AVERAGE')),
+                selected_comparable_property_id TEXT REFERENCES comparable_property(property_id),
+                raw_indicated_unit_price_vnd_per_m2 TEXT NOT NULL,
+                rounded_indicated_unit_price_vnd_per_m2 TEXT NOT NULL,
+                rounding_target TEXT NOT NULL CHECK (rounding_target='UNIT_PRICE'),
+                rounding_increment_vnd INTEGER CHECK (rounding_increment_vnd IS NULL OR rounding_increment_vnd > 0),
+                rounding_source TEXT NOT NULL,
+                rounding_profile_id TEXT,
+                rounding_profile_version TEXT,
+                confirmed_by TEXT NOT NULL CHECK (length(trim(confirmed_by)) > 0),
+                confirmed_at TEXT NOT NULL,
+                reason TEXT NOT NULL CHECK (length(trim(reason)) > 0),
+                quality_snapshot_json TEXT NOT NULL,
+                readiness_snapshot_json TEXT NOT NULL,
+                guidance_snapshot_json TEXT NOT NULL,
+                semantic_sha256 TEXT NOT NULL,
+                CHECK (
+                    (selection_kind='COMPARABLE' AND selected_comparable_property_id IS NOT NULL)
+                    OR
+                    (selection_kind='ZERO_GROSS_AVERAGE' AND selected_comparable_property_id IS NULL)
+                )
+            )""",
+            """CREATE TRIGGER human_indication_snapshot_lineage_guard
+            BEFORE INSERT ON human_indication_snapshot
+            WHEN NEW.selected_comparable_property_id IS NOT NULL
+              AND NEW.case_id != (
+                  SELECT case_id FROM comparable_property
+                  WHERE property_id=NEW.selected_comparable_property_id
+              )
+            BEGIN
+              SELECT RAISE(ABORT, 'human indication selected comparable case lineage mismatch');
+            END""",
+            """CREATE TRIGGER human_indication_snapshot_update_guard
+            BEFORE UPDATE ON human_indication_snapshot
+            BEGIN
+              SELECT RAISE(ABORT, 'human indication snapshot is immutable');
+            END""",
+            """CREATE TRIGGER human_indication_snapshot_delete_guard
+            BEFORE DELETE ON human_indication_snapshot
+            BEGIN
+              SELECT RAISE(ABORT, 'human indication snapshot is append-only');
+            END""",
+            """CREATE TABLE human_indication_source (
+                indication_snapshot_id TEXT NOT NULL REFERENCES human_indication_snapshot(id),
+                case_id TEXT NOT NULL REFERENCES appraisal_case(id),
+                comparable_property_id TEXT NOT NULL REFERENCES comparable_property(property_id),
+                adjustment_snapshot_id TEXT NOT NULL REFERENCES adjustment_calculation_snapshot(id),
+                adjustment_semantic_sha256 TEXT NOT NULL,
+                PRIMARY KEY(indication_snapshot_id, comparable_property_id)
+            )""",
+            """CREATE TRIGGER human_indication_source_lineage_guard
+            BEFORE INSERT ON human_indication_source
+            WHEN NEW.case_id != (
+                    SELECT case_id FROM human_indication_snapshot
+                    WHERE id=NEW.indication_snapshot_id
+                 )
+              OR NEW.case_id != (
+                    SELECT case_id FROM comparable_property
+                    WHERE property_id=NEW.comparable_property_id
+                 )
+              OR NEW.case_id != (
+                    SELECT case_id FROM adjustment_calculation_snapshot
+                    WHERE id=NEW.adjustment_snapshot_id
+                 )
+              OR NEW.comparable_property_id != (
+                    SELECT comparable_property_id FROM adjustment_calculation_snapshot
+                    WHERE id=NEW.adjustment_snapshot_id
+                 )
+              OR NEW.adjustment_semantic_sha256 != (
+                    SELECT semantic_sha256 FROM adjustment_calculation_snapshot
+                    WHERE id=NEW.adjustment_snapshot_id
+                 )
+            BEGIN
+              SELECT RAISE(ABORT, 'human indication source evidence lineage mismatch');
+            END""",
+            """CREATE TRIGGER human_indication_source_cardinality_guard
+            BEFORE INSERT ON human_indication_source
+            WHEN (SELECT COUNT(*) FROM human_indication_source
+                  WHERE indication_snapshot_id=NEW.indication_snapshot_id) >= 3
+            BEGIN
+              SELECT RAISE(ABORT, 'human indication snapshot may bind exactly three comparable sources');
+            END""",
+            """CREATE TRIGGER human_indication_source_update_guard
+            BEFORE UPDATE ON human_indication_source
+            BEGIN
+              SELECT RAISE(ABORT, 'human indication source evidence is immutable');
+            END""",
+            """CREATE TRIGGER human_indication_source_delete_guard
+            BEFORE DELETE ON human_indication_source
+            BEGIN
+              SELECT RAISE(ABORT, 'human indication source evidence is append-only');
+            END""",
+            "CREATE INDEX ix_human_indication_case ON human_indication_snapshot(case_id, confirmed_at, id)",
+            "CREATE INDEX ix_human_indication_source_adjustment ON human_indication_source(adjustment_snapshot_id)",
+        ),
+    ),
 )
 
 LATEST_SCHEMA_VERSION = MIGRATIONS[-1].version
