@@ -3,69 +3,67 @@
 **Date:** 2026-08-17
 **Repository:** `Reguluspt/CEN-Value-RE`
 **Accepted base:** `c4e5753c328443e63ce474c03ecbbbf31a2370ed`
-**Runtime-tested HEAD:** `83f742baf42b9f56c887b80c38b15972f22650a4`
+**Original reviewed HEAD:** `e197ab72a65fe3c2308cad2d866eba704b7e3424`
+**Corrective runtime-tested HEAD:** `74670edb9c5ece5cbd94706808272d6e08a2ee57`
+**Binding corrective run:** `32017538546`
 
 ## Outcome
 
-E1-PR-002 implements the bounded Epic 1 market-normalization and C1–C11 adjustment slice without pulling forward comparable-quality, final-indication, final-valuation, CTXD-engine, workbook-generation, OCR/Maps, Historical Learning, approval-round-trip, or workbench scope.
+E1-PR-002 remains the bounded Epic 1 market-normalization and C1–C11 adjustment slice. The independent review of `e197ab72...` returned three HIGH findings. This corrective loop addresses only those findings and preserves the previously verified frozen calculation and Golden-source behavior.
 
-## Implemented capability
+## Corrective implementation
 
-- exact frozen N08 C1–C11 factor registry and order;
-- Decimal-only market normalization and comparable land-unit base calculation;
-- supplied/precomputed construction value accepted only as an upstream boundary input;
-- frozen adjustment dependency graph with C3–C11 adjustment amounts based on `P1`;
-- explicit selected zero distinct from missing/unreviewed;
-- human-selected rate application service with actor/time/source-revision audit metadata;
-- source-data drift safety that marks decisions stale without overwriting professional selections;
-- complete/current/source-revision decision gate before calculation;
-- deterministic SHA-bound calculation snapshots;
-- encrypted-persistence migration v3 for selection audit and calculation snapshots;
-- case/comparable/decision lineage guards;
-- provenance-complete Golden C1–C11 decision fixture extracted from the exact N08 source workbook.
+### Authoritative adjustment source state
 
-## Golden fixture closure
+The application no longer accepts a caller-supplied revision as authority for selection or calculation. A persisted `AdjustmentSourceState` is the server-side authority for each case/comparable.
 
-The previous canonical Golden Fixture gap for missing explicit C1–C11 decisions is closed for the N08 exemplar by `fixtures/GOLDEN_CASE_ADJUSTMENT_DECISIONS_v1.json`.
+Accepted comparable, market-observation and adjustment-relevant characteristic changes advance the authoritative source revision inside persistence and stale prior CURRENT adjustment decisions. A normalized P0/base value is explicitly bound to the current source revision with evidence metadata; source drift invalidates that binding.
 
-The fixture uses 33 direct stored cells from `Bangtinh!F/G/H` rows `55..105` according to the frozen factor-row registry. Source workbook SHA-256 is `d410cfcc2263d7d50a436a79e192461f04b6863e6c3676a28da7a2eed287389c`.
+### Transaction and concurrency safety
 
-The extracted decisions reproduce the three frozen indicated-price checkpoints exactly:
+Human selection, source-drift state changes, calculation validation and snapshot persistence now use transaction/CAS protection. Decision state is revalidated before snapshot persistence. A stale operation cannot blind-overwrite a newer human reselection, and an older validated decision set cannot persist a snapshot after an intervening decision change.
 
-- `F108 = 196308350`;
-- `G108 = 227083250`;
-- `H108 = 212201640`.
+### Immutable decision lineage
 
-No expected output was used as decision authority.
+The persistence boundary freezes `case_id`, `comparable_property_id` and `factor_key` for an existing adjustment decision identity. Re-parenting or re-factoring an existing decision is rejected, so historical selection-audit lineage cannot become inconsistent with the current decision row.
 
-## Architecture
+## Frozen behavior preserved
 
-Domain calculation remains framework-independent and imports no Flask, SQLCipher, Excel, Astryx, Tauri, or provider SDK.
+The corrective work does not change:
 
-Application orchestration depends on framework-independent persistence ports. Concrete SQLCipher repositories remain in the adapter layer. Human-selection audit is kept separately from the current-state decision row so historical selection evidence is not collapsed into mutable current state.
+- exact frozen N08 C1–C11 factor registry/order;
+- deterministic Decimal-only calculation;
+- explicit selected `0%` versus missing/unreviewed semantics;
+- C1 on P0, C2 on P1, and C3–C11 adjustment amounts on frozen P1;
+- human professional selection authority;
+- supplied/precomputed construction aggregate as an Epic-1 boundary input only;
+- Golden decision fixture source workbook SHA/cell provenance;
+- exact Golden outputs `F108=196308350`, `G108=227083250`, `H108=212201640`.
 
-## Persistence
+## Persistence changes
 
-Migration v3 adds:
+The E1-PR-002 persistence extension now includes:
 
-- adjustment-decision case/comparable lineage triggers;
-- append-only-by-repository `adjustment_selection_audit` records;
-- immutable-by-repository `adjustment_calculation_snapshot` records;
-- audit/snapshot lineage triggers and indexes.
+- adjustment source-state persistence;
+- server-authoritative revision advancement and P0 invalidation on source change;
+- transactional staling of CURRENT decisions on source change;
+- CAS-capable decision updates;
+- immutable decision lineage/factor guards;
+- existing selection-audit and calculation-snapshot lineage protections.
 
-The existing E1-PR-001 manual-data schema and behavior remain forward-compatible; its migration-v2 regression test continues to inspect v2 exactly while allowing later strictly ordered migrations.
+No Epic 2/3/4/5 or E1-PR-003+ capability is pulled into this corrective loop.
 
 ## Verification
 
-Binding Windows run `32009934815` on exact runtime-tested HEAD `83f742baf42b9f56c887b80c38b15972f22650a4`:
+Binding corrective Windows run `32017538546` on exact runtime-tested HEAD `74670edb9c5ece5cbd94706808272d6e08a2ee57`:
 
-- diff hygiene PASS;
-- compile PASS;
-- full `tests/re`: **177 passed in 3.21s**;
-- focused E1-PR-002: **27 passed in 0.13s**.
+- diff hygiene: PASS;
+- compile: PASS;
+- full `tests/re`: **184 passed in 3.35s**;
+- focused corrective E1-PR-002: **34 passed in 0.18s**.
 
-Run `32009701673` is explicitly superseded; it exposed two stale schema-version assertions and is not acceptance evidence.
+The focused suite includes the reviewer-requested negative/interleaving conditions for old-revision replay, human reselection versus drift write, stale/reselected decision before snapshot, and decision re-parent/re-factor rejection.
 
 ## Acceptance boundary
 
-The requested gate is E1-PR-002 `AdjustmentCalculationGate` only. The implementer does not self-issue `ACCEPTED`.
+The requested gate remains E1-PR-002 `AdjustmentCalculationGate` only. The implementer does not self-issue `ACCEPTED` and E1-PR-003 must not begin until independent re-review accepts the corrective review HEAD.
