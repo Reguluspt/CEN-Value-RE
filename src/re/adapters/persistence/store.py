@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 from .key_protection import KeyProtector, load_or_create_master_key
 from .migrations import apply_migrations
@@ -14,6 +15,11 @@ from .repositories import (
     SQLCipherCaseRepository,
     SQLCipherComparablePropertyRepository,
     SQLCipherConstructionAssetRepository,
+    SQLCipherEvidenceRepository,
+    SQLCipherLandParcelRepository,
+    SQLCipherLandValuationComponentRepository,
+    SQLCipherMarketObservationRepository,
+    SQLCipherPropertyCharacteristicRepository,
     SQLCipherSubjectPropertyRepository,
 )
 from .sqlcipher import cipher_version, open_encrypted_connection
@@ -39,6 +45,11 @@ class SQLCipherUnitOfWork:
         self.cases = SQLCipherCaseRepository(connection)
         self.subjects = SQLCipherSubjectPropertyRepository(connection)
         self.comparables = SQLCipherComparablePropertyRepository(connection)
+        self.land_parcels = SQLCipherLandParcelRepository(connection)
+        self.land_valuation_components = SQLCipherLandValuationComponentRepository(connection)
+        self.property_characteristics = SQLCipherPropertyCharacteristicRepository(connection)
+        self.market_observations = SQLCipherMarketObservationRepository(connection)
+        self.evidence = SQLCipherEvidenceRepository(connection)
         self.construction_assets = SQLCipherConstructionAssetRepository(connection)
         self.adjustment_decisions = SQLCipherAdjustmentDecisionRepository(connection)
         self.approval_submissions = SQLCipherApprovalSubmissionRepository(connection)
@@ -50,6 +61,18 @@ class SQLCipherUnitOfWork:
     @property
     def sqlcipher_version(self) -> str:
         return cipher_version(self._connection)
+
+    @contextmanager
+    def atomic(self) -> Iterator[None]:
+        if bool(getattr(self._connection, "in_transaction", False)):
+            raise RuntimeError("Nested persistence transactions are not supported")
+        self._connection.execute("BEGIN IMMEDIATE")
+        try:
+            yield
+            self._connection.commit()
+        except Exception:
+            self._connection.rollback()
+            raise
 
     def close(self) -> None:
         self._connection.close()

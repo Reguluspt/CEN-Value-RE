@@ -17,6 +17,15 @@ from .golden_fixture import (
     load_golden_fixture,
     resolve_json_pointer,
 )
+from .manual_case import (
+    ManualCaseConflictError,
+    ManualCaseError,
+    ManualCaseNotFoundError,
+    ManualCasePersistenceError,
+    ManualCaseService,
+    ManualCaseValidationError,
+    UnsupportedProfileError,
+)
 
 __all__ = [
     "CheckpointManifest",
@@ -28,6 +37,13 @@ __all__ = [
     "GoldenFixtureBundle",
     "GoldenFixtureFormatError",
     "GoldenFixtureSnapshot",
+    "ManualCaseConflictError",
+    "ManualCaseError",
+    "ManualCaseNotFoundError",
+    "ManualCasePersistenceError",
+    "ManualCaseService",
+    "ManualCaseValidationError",
+    "UnsupportedProfileError",
     "compare_checkpoint",
     "evaluate_checkpoint_results",
     "load_checkpoint_manifest",
