@@ -6,6 +6,7 @@ from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from typing import Protocol
 
+from .adjustment_source import AdjustmentSourceStateRepository
 from .persistence import AdjustmentDecisionRecord, CaseRepository, ComparablePropertyRepository
 
 
@@ -40,6 +41,14 @@ class AdjustmentCalculationSnapshotRecord:
     created_at: str
 
 
+class AdjustmentDecisionWriteRepository(Protocol):
+    def put(self, record: AdjustmentDecisionRecord) -> None: ...
+
+    def put_if_version(
+        self, record: AdjustmentDecisionRecord, *, expected_version: int
+    ) -> bool: ...
+
+
 class AdjustmentDecisionQueryRepository(Protocol):
     def list_for_comparable(
         self, case_id: str, comparable_property_id: str
@@ -67,9 +76,10 @@ class AdjustmentCalculationSnapshotRepository(Protocol):
 class AdjustmentPersistenceUnitOfWork(Protocol):
     cases: CaseRepository
     comparables: ComparablePropertyRepository
-    adjustment_decisions: object
+    adjustment_decisions: AdjustmentDecisionWriteRepository
     adjustment_decision_queries: AdjustmentDecisionQueryRepository
     adjustment_selection_audit: AdjustmentSelectionAuditRepository
     adjustment_calculation_snapshots: AdjustmentCalculationSnapshotRepository
+    adjustment_source_states: AdjustmentSourceStateRepository
 
     def atomic(self) -> AbstractContextManager[None]: ...
