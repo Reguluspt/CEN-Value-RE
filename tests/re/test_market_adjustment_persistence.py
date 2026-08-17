@@ -1,3 +1,5 @@
+import hashlib
+import json
 import sqlite3
 
 import pytest
@@ -64,6 +66,38 @@ def _seed_case_comparable_decision(connection):
     connection.commit()
 
 
+def _select_all(service):
+    for index in range(1, 12):
+        service.select_rate(
+            case_id="case-1",
+            comparable_property_id="comp-1",
+            factor_key=f"C{index}",
+            selected_rate="0",
+            selected_by="appraiser",
+        )
+
+
+def _semantic_sha_from_snapshot(snapshot):
+    payload = {
+        "case_id": snapshot.case_id,
+        "comparable_property_id": snapshot.comparable_property_id,
+        "source_data_revision": snapshot.source_data_revision,
+        "normalized_base_price_vnd_per_m2": snapshot.normalized_base_price_vnd_per_m2,
+        "normalized_base_evidence_ref": snapshot.normalized_base_evidence_ref,
+        "property_adjustment_base_vnd_per_m2": snapshot.property_adjustment_base_vnd_per_m2,
+        "indicated_unit_price_vnd_per_m2": snapshot.indicated_unit_price_vnd_per_m2,
+        "decision_set_sha256": snapshot.decision_set_sha256,
+        "steps": json.loads(snapshot.ordered_steps_json),
+    }
+    encoded = json.dumps(
+        payload,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
 def test_schema_v3_creates_authoritative_source_state_and_identity_guards():
     connection = _connection()
     try:
@@ -78,6 +112,13 @@ def test_schema_v3_creates_authoritative_source_state_and_identity_guards():
         assert "adjustment_selection_audit" in names
         assert "adjustment_calculation_snapshot" in names
         assert "adjustment_source_state" in names
+        columns = {
+            row["name"]
+            for row in connection.execute(
+                "PRAGMA table_info(adjustment_calculation_snapshot)"
+            )
+        }
+        assert "normalized_base_evidence_ref" in columns
         triggers = {
             row["name"]
             for row in connection.execute(
@@ -176,11 +217,19 @@ def test_strict_repository_upsert_never_updates_identity_fields():
         connection.close()
 
 
-def test_market_observation_update_atomically_bumps_revision_clears_p0_and_stales_rate():
+def test_market_observation_update_atomically_bumps_revision_clears_p0_stales_and_audits():
     connection = _connection()
     try:
         apply_migrations(connection)
         _seed_case_comparable_decision(connection)
+        connection.execute(
+            """INSERT INTO adjustment_selection_audit(
+                id,adjustment_decision_id,case_id,comparable_property_id,factor_key,
+                event_kind,selected_rate_pct,selected_explicitly,selected_by,selected_at,
+                source_data_revision,review_status
+            ) VALUES ('selected-1','decision-1','case-1','comp-1','C1',
+                'SELECTED','0',1,'appraiser','t','1','CURRENT')"""
+        )
         connection.execute(
             """UPDATE adjustment_source_state
             SET normalized_base_price_vnd_per_m2='230951000',
@@ -202,11 +251,75 @@ def test_market_observation_update_atomically_bumps_revision_clears_p0_and_stale
         decision = connection.execute(
             "SELECT selected_rate_pct,review_status FROM adjustment_decision WHERE id='decision-1'"
         ).fetchone()
+        audit = connection.execute(
+            """SELECT event_kind,selected_by,source_data_revision,review_status
+            FROM adjustment_selection_audit
+            WHERE adjustment_decision_id='decision-1'
+            ORDER BY rowid DESC LIMIT 1"""
+        ).fetchone()
         assert after["source_revision"] == before + 1
         assert after["normalized_base_price_vnd_per_m2"] is None
         assert after["normalized_base_bound_revision"] is None
         assert decision["selected_rate_pct"] == "0"
         assert decision["review_status"] == "SOURCE_DATA_CHANGED"
+        assert audit == {
+            "event_kind": "SOURCE_DATA_CHANGED",
+            "selected_by": "SYSTEM_SOURCE_DRIFT",
+            "source_data_revision": str(after["source_revision"]),
+            "review_status": "SOURCE_DATA_CHANGED",
+        }
+    finally:
+        connection.close()
+
+
+def test_material_p0_rebind_advances_revision_stales_rates_and_requires_reselection():
+    connection = _connection()
+    try:
+        schema_version = apply_migrations(connection)
+        _seed_case_comparable_decision(connection)
+        uow = SQLCipherUnitOfWork(connection, schema_version)
+        service = MarketAdjustmentService(uow, now=lambda: "2026-08-17T02:00:00Z")
+        first = service.bind_normalized_base(
+            case_id="case-1",
+            comparable_property_id="comp-1",
+            normalized_base_price_vnd_per_m2="1000",
+            evidence_ref="source://P0-A",
+        )
+        _select_all(service)
+        first_run = service.run_adjustment(
+            case_id="case-1", comparable_property_id="comp-1"
+        )
+        assert first_run.result.indicated_unit_price_vnd_per_m2 == 1000
+
+        rebound = service.bind_normalized_base(
+            case_id="case-1",
+            comparable_property_id="comp-1",
+            normalized_base_price_vnd_per_m2="9000",
+            evidence_ref="source://P0-B",
+        )
+        assert rebound.source_revision == first.source_revision + 1
+        decisions = uow.adjustment_decision_queries.list_for_comparable(
+            "case-1", "comp-1"
+        )
+        assert len(decisions) == 11
+        assert all(item.review_status == "SOURCE_DATA_CHANGED" for item in decisions)
+        assert all(item.selected_rate_pct == "0" for item in decisions)
+        drift_audits = connection.execute(
+            """SELECT COUNT(*) AS count FROM adjustment_selection_audit
+            WHERE comparable_property_id='comp-1'
+              AND event_kind='SOURCE_DATA_CHANGED'
+              AND source_data_revision=?""",
+            (str(rebound.source_revision),),
+        ).fetchone()["count"]
+        assert drift_audits == 11
+        with pytest.raises(MarketAdjustmentConflictError, match="human review"):
+            service.run_adjustment(case_id="case-1", comparable_property_id="comp-1")
+
+        _select_all(service)
+        second_run = service.run_adjustment(
+            case_id="case-1", comparable_property_id="comp-1"
+        )
+        assert second_run.result.indicated_unit_price_vnd_per_m2 == 9000
     finally:
         connection.close()
 
@@ -285,6 +398,17 @@ def test_manual_case_source_change_rejects_old_revision_even_when_caller_replays
         decisions = uow.adjustment_decision_queries.list_for_comparable(case_id, comp_id)
         assert all(item.review_status == "SOURCE_DATA_CHANGED" for item in decisions)
         assert all(item.selected_rate_pct == "0" for item in decisions)
+        audits = connection.execute(
+            """SELECT event_kind,selected_by,source_data_revision FROM adjustment_selection_audit
+            WHERE comparable_property_id=? AND event_kind='SOURCE_DATA_CHANGED'""",
+            (comp_id,),
+        ).fetchall()
+        assert audits
+        assert all(item["selected_by"] == "SYSTEM_SOURCE_DRIFT" for item in audits)
+        assert all(
+            item["source_data_revision"] == str(current_state.source_revision)
+            for item in audits[-11:]
+        )
 
         with pytest.raises(MarketAdjustmentConflictError):
             adjustment.run_adjustment(
@@ -315,6 +439,40 @@ def test_selection_audit_must_bind_exact_decision_case_comparable_and_factor():
         connection.close()
 
 
+def test_snapshot_semantic_sha_is_reconstructable_after_source_drift():
+    connection = _connection()
+    try:
+        schema_version = apply_migrations(connection)
+        _seed_case_comparable_decision(connection)
+        uow = SQLCipherUnitOfWork(connection, schema_version)
+        service = MarketAdjustmentService(uow, now=lambda: "2026-08-17T03:00:00Z")
+        service.bind_normalized_base(
+            case_id="case-1",
+            comparable_property_id="comp-1",
+            normalized_base_price_vnd_per_m2="1000",
+            evidence_ref="source://immutable-P0-A",
+        )
+        _select_all(service)
+        run = service.run_adjustment(case_id="case-1", comparable_property_id="comp-1")
+        snapshot = uow.adjustment_calculation_snapshots.get(run.snapshot_id)
+        assert snapshot is not None
+        assert snapshot.normalized_base_evidence_ref == "source://immutable-P0-A"
+        assert _semantic_sha_from_snapshot(snapshot) == snapshot.semantic_sha256
+
+        service.bind_normalized_base(
+            case_id="case-1",
+            comparable_property_id="comp-1",
+            normalized_base_price_vnd_per_m2="9000",
+            evidence_ref="source://immutable-P0-B",
+        )
+        old_snapshot = uow.adjustment_calculation_snapshots.get(run.snapshot_id)
+        assert old_snapshot is not None
+        assert old_snapshot.normalized_base_evidence_ref == "source://immutable-P0-A"
+        assert _semantic_sha_from_snapshot(old_snapshot) == old_snapshot.semantic_sha256
+    finally:
+        connection.close()
+
+
 def test_calculation_snapshot_cannot_cross_case_lineage():
     connection = _connection()
     try:
@@ -324,10 +482,10 @@ def test_calculation_snapshot_cannot_cross_case_lineage():
             connection.execute(
                 """INSERT INTO adjustment_calculation_snapshot(
                     id,case_id,comparable_property_id,source_data_revision,
-                    normalized_base_price_vnd_per_m2,property_adjustment_base_vnd_per_m2,
-                    indicated_unit_price_vnd_per_m2,decision_set_sha256,ordered_steps_json,
-                    semantic_sha256,created_at
-                ) VALUES ('snapshot-bad','case-2','comp-1','1','1','1','1',
+                    normalized_base_price_vnd_per_m2,normalized_base_evidence_ref,
+                    property_adjustment_base_vnd_per_m2,indicated_unit_price_vnd_per_m2,
+                    decision_set_sha256,ordered_steps_json,semantic_sha256,created_at
+                ) VALUES ('snapshot-bad','case-2','comp-1','1','1','evidence://x','1','1',
                     'd','[]','s','t')"""
             )
     finally:
