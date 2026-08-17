@@ -317,12 +317,9 @@ MIGRATIONS = (
             AFTER UPDATE OF legal_address,current_address,latitude,longitude,planning_note,environment_note,version,archived_at ON property
             WHEN NEW.role='COMPARABLE'
             BEGIN
-              UPDATE adjustment_source_state
-              SET source_revision=source_revision+1,
-                  normalized_base_price_vnd_per_m2=NULL,
-                  normalized_base_bound_revision=NULL,
-                  normalized_base_evidence_ref=NULL,
-                  updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
+              UPDATE adjustment_source_state SET source_revision=source_revision+1,
+                  normalized_base_price_vnd_per_m2=NULL,normalized_base_bound_revision=NULL,
+                  normalized_base_evidence_ref=NULL,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
               WHERE comparable_property_id=NEW.id;
               INSERT INTO adjustment_selection_audit(
                   id,adjustment_decision_id,case_id,comparable_property_id,factor_key,event_kind,
@@ -333,19 +330,15 @@ MIGRATIONS = (
                   CAST((SELECT source_revision FROM adjustment_source_state WHERE comparable_property_id=NEW.id) AS TEXT),
                   'SOURCE_DATA_CHANGED'
               FROM adjustment_decision WHERE comparable_property_id=NEW.id AND review_status='CURRENT';
-              UPDATE adjustment_decision
-              SET review_status='SOURCE_DATA_CHANGED',version=version+1
+              UPDATE adjustment_decision SET review_status='SOURCE_DATA_CHANGED',version=version+1
               WHERE comparable_property_id=NEW.id AND review_status='CURRENT';
             END""",
             """CREATE TRIGGER adjustment_source_market_insert
             AFTER INSERT ON market_observation
             BEGIN
-              UPDATE adjustment_source_state
-              SET source_revision=source_revision+1,
-                  normalized_base_price_vnd_per_m2=NULL,
-                  normalized_base_bound_revision=NULL,
-                  normalized_base_evidence_ref=NULL,
-                  updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
+              UPDATE adjustment_source_state SET source_revision=source_revision+1,
+                  normalized_base_price_vnd_per_m2=NULL,normalized_base_bound_revision=NULL,
+                  normalized_base_evidence_ref=NULL,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
               WHERE comparable_property_id=NEW.comparable_property_id;
               INSERT INTO adjustment_selection_audit(
                   id,adjustment_decision_id,case_id,comparable_property_id,factor_key,event_kind,
@@ -356,19 +349,15 @@ MIGRATIONS = (
                   CAST((SELECT source_revision FROM adjustment_source_state WHERE comparable_property_id=NEW.comparable_property_id) AS TEXT),
                   'SOURCE_DATA_CHANGED'
               FROM adjustment_decision WHERE comparable_property_id=NEW.comparable_property_id AND review_status='CURRENT';
-              UPDATE adjustment_decision
-              SET review_status='SOURCE_DATA_CHANGED',version=version+1
+              UPDATE adjustment_decision SET review_status='SOURCE_DATA_CHANGED',version=version+1
               WHERE comparable_property_id=NEW.comparable_property_id AND review_status='CURRENT';
             END""",
             """CREATE TRIGGER adjustment_source_market_update
             AFTER UPDATE ON market_observation
             BEGIN
-              UPDATE adjustment_source_state
-              SET source_revision=source_revision+1,
-                  normalized_base_price_vnd_per_m2=NULL,
-                  normalized_base_bound_revision=NULL,
-                  normalized_base_evidence_ref=NULL,
-                  updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
+              UPDATE adjustment_source_state SET source_revision=source_revision+1,
+                  normalized_base_price_vnd_per_m2=NULL,normalized_base_bound_revision=NULL,
+                  normalized_base_evidence_ref=NULL,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
               WHERE comparable_property_id=NEW.comparable_property_id;
               INSERT INTO adjustment_selection_audit(
                   id,adjustment_decision_id,case_id,comparable_property_id,factor_key,event_kind,
@@ -379,20 +368,16 @@ MIGRATIONS = (
                   CAST((SELECT source_revision FROM adjustment_source_state WHERE comparable_property_id=NEW.comparable_property_id) AS TEXT),
                   'SOURCE_DATA_CHANGED'
               FROM adjustment_decision WHERE comparable_property_id=NEW.comparable_property_id AND review_status='CURRENT';
-              UPDATE adjustment_decision
-              SET review_status='SOURCE_DATA_CHANGED',version=version+1
+              UPDATE adjustment_decision SET review_status='SOURCE_DATA_CHANGED',version=version+1
               WHERE comparable_property_id=NEW.comparable_property_id AND review_status='CURRENT';
             END""",
             """CREATE TRIGGER adjustment_source_characteristic_insert
             AFTER INSERT ON property_characteristic
             WHEN EXISTS(SELECT 1 FROM property WHERE id=NEW.property_id AND role='COMPARABLE')
             BEGIN
-              UPDATE adjustment_source_state
-              SET source_revision=source_revision+1,
-                  normalized_base_price_vnd_per_m2=NULL,
-                  normalized_base_bound_revision=NULL,
-                  normalized_base_evidence_ref=NULL,
-                  updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
+              UPDATE adjustment_source_state SET source_revision=source_revision+1,
+                  normalized_base_price_vnd_per_m2=NULL,normalized_base_bound_revision=NULL,
+                  normalized_base_evidence_ref=NULL,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
               WHERE comparable_property_id=NEW.property_id;
               INSERT INTO adjustment_selection_audit(
                   id,adjustment_decision_id,case_id,comparable_property_id,factor_key,event_kind,
@@ -403,20 +388,16 @@ MIGRATIONS = (
                   CAST((SELECT source_revision FROM adjustment_source_state WHERE comparable_property_id=NEW.property_id) AS TEXT),
                   'SOURCE_DATA_CHANGED'
               FROM adjustment_decision WHERE comparable_property_id=NEW.property_id AND review_status='CURRENT';
-              UPDATE adjustment_decision
-              SET review_status='SOURCE_DATA_CHANGED',version=version+1
+              UPDATE adjustment_decision SET review_status='SOURCE_DATA_CHANGED',version=version+1
               WHERE comparable_property_id=NEW.property_id AND review_status='CURRENT';
             END""",
             """CREATE TRIGGER adjustment_source_characteristic_update
             AFTER UPDATE ON property_characteristic
             WHEN EXISTS(SELECT 1 FROM property WHERE id=NEW.property_id AND role='COMPARABLE')
             BEGIN
-              UPDATE adjustment_source_state
-              SET source_revision=source_revision+1,
-                  normalized_base_price_vnd_per_m2=NULL,
-                  normalized_base_bound_revision=NULL,
-                  normalized_base_evidence_ref=NULL,
-                  updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
+              UPDATE adjustment_source_state SET source_revision=source_revision+1,
+                  normalized_base_price_vnd_per_m2=NULL,normalized_base_bound_revision=NULL,
+                  normalized_base_evidence_ref=NULL,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
               WHERE comparable_property_id=NEW.property_id;
               INSERT INTO adjustment_selection_audit(
                   id,adjustment_decision_id,case_id,comparable_property_id,factor_key,event_kind,
@@ -427,8 +408,7 @@ MIGRATIONS = (
                   CAST((SELECT source_revision FROM adjustment_source_state WHERE comparable_property_id=NEW.property_id) AS TEXT),
                   'SOURCE_DATA_CHANGED'
               FROM adjustment_decision WHERE comparable_property_id=NEW.property_id AND review_status='CURRENT';
-              UPDATE adjustment_decision
-              SET review_status='SOURCE_DATA_CHANGED',version=version+1
+              UPDATE adjustment_decision SET review_status='SOURCE_DATA_CHANGED',version=version+1
               WHERE comparable_property_id=NEW.property_id AND review_status='CURRENT';
             END""",
             "CREATE INDEX ix_adjustment_audit_decision ON adjustment_selection_audit(adjustment_decision_id, selected_at, id)",
@@ -481,4 +461,10 @@ def apply_migrations(connection) -> int:
             raise
 
     row = connection.execute("SELECT MAX(version) FROM re_schema_migration").fetchone()
-    return _scalar(row) if row and row[0] is not None else 0
+    if row is None:
+        return 0
+    if isinstance(row, dict):
+        value = next(iter(row.values()), None)
+    else:
+        value = row[0]
+    return int(value) if value is not None else 0
