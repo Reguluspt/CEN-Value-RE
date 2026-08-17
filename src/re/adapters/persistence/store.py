@@ -7,10 +7,15 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterator
 
+from .adjustment_repositories import (
+    SQLCipherAdjustmentCalculationSnapshotRepository,
+    SQLCipherAdjustmentDecisionQueryRepository,
+    SQLCipherAdjustmentSelectionAuditRepository,
+)
+from .adjustment_source_repository import SQLCipherAdjustmentSourceStateRepository
 from .key_protection import KeyProtector, load_or_create_master_key
 from .migrations import apply_migrations
 from .repositories import (
-    SQLCipherAdjustmentDecisionRepository,
     SQLCipherApprovalSubmissionRepository,
     SQLCipherCaseRepository,
     SQLCipherComparablePropertyRepository,
@@ -22,6 +27,7 @@ from .repositories import (
     SQLCipherPropertyCharacteristicRepository,
     SQLCipherSubjectPropertyRepository,
 )
+from .strict_adjustment_decision_repository import StrictSQLCipherAdjustmentDecisionRepository
 from .sqlcipher import cipher_version, open_encrypted_connection
 
 
@@ -51,7 +57,11 @@ class SQLCipherUnitOfWork:
         self.market_observations = SQLCipherMarketObservationRepository(connection)
         self.evidence = SQLCipherEvidenceRepository(connection)
         self.construction_assets = SQLCipherConstructionAssetRepository(connection)
-        self.adjustment_decisions = SQLCipherAdjustmentDecisionRepository(connection)
+        self.adjustment_decisions = StrictSQLCipherAdjustmentDecisionRepository(connection)
+        self.adjustment_decision_queries = SQLCipherAdjustmentDecisionQueryRepository(connection)
+        self.adjustment_selection_audit = SQLCipherAdjustmentSelectionAuditRepository(connection)
+        self.adjustment_calculation_snapshots = SQLCipherAdjustmentCalculationSnapshotRepository(connection)
+        self.adjustment_source_states = SQLCipherAdjustmentSourceStateRepository(connection)
         self.approval_submissions = SQLCipherApprovalSubmissionRepository(connection)
 
     @property

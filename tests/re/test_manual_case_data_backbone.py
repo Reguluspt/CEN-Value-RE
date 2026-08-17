@@ -124,7 +124,8 @@ def test_manual_case_subject_and_three_comparables_round_trip_exact_strings(tmp_
 
     persistence = _persistence(tmp_path, legacy=legacy)
     with persistence.open() as uow:
-        assert uow.schema_version == LATEST_SCHEMA_VERSION == 2
+        assert uow.schema_version == LATEST_SCHEMA_VERSION
+        assert LATEST_SCHEMA_VERSION >= 2
         service = _service(uow)
         created = _create_case(service)
         case_id = created.case.id
@@ -390,7 +391,12 @@ def test_local_service_exercises_manual_use_case_without_direct_db_access(tmp_pa
 
 
 def test_migration_v2_is_explicit_ordered_backbone_extension() -> None:
-    assert [migration.version for migration in MIGRATIONS] == [1, 2]
+    assert [migration.version for migration in MIGRATIONS[:2]] == [1, 2]
+    assert all(
+        earlier.version < later.version
+        for earlier, later in zip(MIGRATIONS, MIGRATIONS[1:])
+    )
+    assert LATEST_SCHEMA_VERSION >= 2
     migration = MIGRATIONS[1]
     assert migration.name == "epic1_manual_case_data_backbone"
     joined = "\n".join(migration.statements)

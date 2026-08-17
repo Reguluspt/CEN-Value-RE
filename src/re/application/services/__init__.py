@@ -26,6 +26,15 @@ from .manual_case import (
     ManualCaseValidationError,
     UnsupportedProfileError,
 )
+from .market_adjustment import (
+    MarketAdjustmentConflictError,
+    MarketAdjustmentError,
+    MarketAdjustmentNotFoundError,
+    MarketAdjustmentPersistenceError,
+    MarketAdjustmentService,
+    MarketAdjustmentValidationError,
+    PersistedAdjustmentRun,
+)
 
 __all__ = [
     "CheckpointManifest",
@@ -43,6 +52,13 @@ __all__ = [
     "ManualCasePersistenceError",
     "ManualCaseService",
     "ManualCaseValidationError",
+    "MarketAdjustmentConflictError",
+    "MarketAdjustmentError",
+    "MarketAdjustmentNotFoundError",
+    "MarketAdjustmentPersistenceError",
+    "MarketAdjustmentService",
+    "MarketAdjustmentValidationError",
+    "PersistedAdjustmentRun",
     "UnsupportedProfileError",
     "compare_checkpoint",
     "evaluate_checkpoint_results",

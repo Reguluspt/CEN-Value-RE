@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "fixture_id": "N08-0038-adjustment-decisions-v1",
+  "semantic_sha256": "66423a0a2877c60577984e0a9c898d388902c4b434934c34dc57a7261572f1c4",
+  "semantic_digest_rule": "SHA-256 of canonical JSON payload excluding semantic_sha256 and semantic_digest_rule; UTF-8, sort_keys=true, separators=(',', ':')",
+  "source": {
+    "workbook": "(Trunghd_HTG) N08-0038-Huedtl-MTNguyenVanDau-P5-PhuNhuan-htg.xlsx",
+    "workbook_sha256": "d410cfcc2263d7d50a436a79e192461f04b6863e6c3676a28da7a2eed287389c",
+    "sheet": "Bangtinh",
+    "extraction_kind": "DIRECT_STORED_CELL_VALUE",
+    "extracted_from_rate_rows": [55, 60, 65, 70, 75, 80, 85, 90, 95, 100, 105],
+    "actor_metadata_status": "NOT_AVAILABLE_IN_SOURCE_WORKBOOK"
+  },
+  "comparables": [
+    {
+      "comparable_id": "TSSS01",
+      "workbook_column": "F",
+      "decisions": [
+        {"factor_key":"C1","canonical_key":"legal_status","selected_rate_fraction":"0","selected_explicitly":true,"source_cell":"Bangtinh!F55"},
+        {"factor_key":"C2","canonical_key":"location","selected_rate_fraction":"-0.05","selected_explicitly":true,"source_cell":"Bangtinh!F60"},
+        {"factor_key":"C3","canonical_key":"relative_distance_to_local_points","selected_rate_fraction":"0","selected_explicitly":true,"source_cell":"Bangtinh!F65"},
+        {"factor_key":"C4","canonical_key":"scale_area","selected_rate_fraction":"-0.1","selected_explicitly":true,"source_cell":"Bangtinh!F70"},
+        {"factor_key":"C5","canonical_key":"frontage","selected_rate_fraction":"0","selected_explicitly":true,"source_cell":"Bangtinh!F75"},
+        {"factor_key":"C6","canonical_key":"depth","selected_rate_fraction":"0","selected_explicitly":true,"source_cell":"Bangtinh!F80"},
+        {"factor_key":"C7","canonical_key":"shape","selected_rate_fraction":"0","selected_explicitly":true,"source_cell":"Bangtinh!F85"},
+        {"factor_key":"C8","canonical_key":"traffic_access","selected_rate_fraction":"0","selected_explicitly":true,"source_cell":"Bangtinh!F90"},
+        {"factor_key":"C9","canonical_key":"business_environment","selected_rate_fraction":"0","selected_explicitly":true,"source_cell":"Bangtinh!F95"},
+        {"factor_key":"C10","canonical_key":"infrastructure","selected_rate_fraction":"0","selected_explicitly":true,"source_cell":"Bangtinh!F100"},
+        {"factor_key":"C11","canonical_key":"other_disadvantage","selected_rate_fraction":"0","selected_explicitly":true,"source_cell":"Bangtinh!F105"}
+      ]
+    },
+    {
+      "comparable_id": "TSSS02",
+      "workbook_column": "G",
+      "decisions": [
+        {"factor_key":"C1","canonical_key":"legal_status","selected_rate_fraction":"0","selected_explicitly":true,"source_cell":"Bangtinh!G55"},
+        {"factor_key":"C2","canonical_key":"location","selected_rate_fraction":"-0.05","selected_explicitly":true,"source_cell":"Bangtinh!G60"},
+        {"factor_key":"C3","canonical_key":"relative_distance_to_local_points","selected_rate_fraction":"0","selected_explicitly":true,"source_cell":"Bangtinh!G65"},
+        {"factor_key":"C4","canonical_key":"scale_area","selected_rate_fraction":"0.1","selected_explicitly":true,"source_cell":"Bangtinh!G70"},
+        {"factor_key":"C5","canonical_key":"frontage","selected_rate_fraction":"-0.15","selected_explicitly":true,"source_cell":"Bangtinh!G75"},
+        {"factor_key":"C6","canonical_key":"depth","selected_rate_fraction":"0","selected_explicitly":true,"source_cell":"Bangtinh!G80"},
+        {"factor_key":"C7","canonical_key":"shape","selected_rate_fraction":"0.05","selected_explicitly":true,"source_cell":"Bangtinh!G85"},
+        {"factor_key":"C8","canonical_key":"traffic_access","selected_rate_fraction":"0","selected_explicitly":true,"source_cell":"Bangtinh!G90"},
+        {"factor_key":"C9","canonical_key":"business_environment","selected_rate_fraction":"0","selected_explicitly":true,"source_cell":"Bangtinh!G95"},
+        {"factor_key":"C10","canonical_key":"infrastructure","selected_rate_fraction":"0","selected_explicitly":true,"source_cell":"Bangtinh!G100"},
+        {"factor_key":"C11","canonical_key":"other_disadvantage","selected_rate_fraction":"0","selected_explicitly":true,"source_cell":"Bangtinh!G105"}
+      ]
+    },
+    {
+      "comparable_id": "TSSS03",
+      "workbook_column": "H",
+      "decisions": [
+        {"factor_key":"C1","canonical_key":"legal_status","selected_rate_fraction":"0","selected_explicitly":true,"source_cell":"Bangtinh!H55"},
+        {"factor_key":"C2","canonical_key":"location","selected_rate_fraction":"0","selected_explicitly":true,"source_cell":"Bangtinh!H60"},
+        {"factor_key":"C3","canonical_key":"relative_distance_to_local_points","selected_rate_fraction":"0","selected_explicitly":true,"source_cell":"Bangtinh!H65"},
+        {"factor_key":"C4","canonical_key":"scale_area","selected_rate_fraction":"0.03","selected_explicitly":true,"source_cell":"Bangtinh!H70"},
+        {"factor_key":"C5","canonical_key":"frontage","selected_rate_fraction":"-0.05","selected_explicitly":true,"source_cell":"Bangtinh!H75"},
+        {"factor_key":"C6","canonical_key":"depth","selected_rate_fraction":"0","selected_explicitly":true,"source_cell":"Bangtinh!H80"},
+        {"factor_key":"C7","canonical_key":"shape","selected_rate_fraction":"0.05","selected_explicitly":true,"source_cell":"Bangtinh!H85"},
+        {"factor_key":"C8","canonical_key":"traffic_access","selected_rate_fraction":"0","selected_explicitly":true,"source_cell":"Bangtinh!H90"},
+        {"factor_key":"C9","canonical_key":"business_environment","selected_rate_fraction":"0","selected_explicitly":true,"source_cell":"Bangtinh!H95"},
+        {"factor_key":"C10","canonical_key":"infrastructure","selected_rate_fraction":"0","selected_explicitly":true,"source_cell":"Bangtinh!H100"},
+        {"factor_key":"C11","canonical_key":"other_disadvantage","selected_rate_fraction":"0.05","selected_explicitly":true,"source_cell":"Bangtinh!H105"}
+      ]
+    }
+  ]
+}
