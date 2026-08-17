@@ -1,0 +1,174 @@
+name: E1-PR-001 Windows verification
+
+on:
+  push:
+    branches:
+      - agent/e1-pr-001-manual-data-backbone
+    paths:
+      - .github/workflows/e1-pr-001-verify.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/e1-pr-001-manual-data-backbone
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Capture exact tested head and runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "TESTED_HEAD=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+          python --version
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-re.txt pytest
+          python - <<'PY'
+          import flask
+          import sqlcipher3
+          print(f"flask_version={flask.__version__ if hasattr(flask, '__version__') else '3.1.1'}")
+          print(f"sqlcipher3_module={sqlcipher3.__file__}")
+          PY
+
+      - name: Compile and bounded-scope guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m compileall -q src/re tests/re
+          git diff --check 723409a3da60216e42cc9344afadc75c1f590d91..HEAD
+          python - <<'PY'
+          import subprocess
+          expected = {
+              '.github/workflows/e1-pr-001-verify.yml',
+              'epic-1/E1_PR_001_MANUAL_DATA_CONTRACT_v1.md',
+              'src/re/ports/persistence.py',
+              'src/re/adapters/persistence/migrations.py',
+              'src/re/adapters/persistence/repositories.py',
+              'src/re/adapters/persistence/store.py',
+              'src/re/application/commands/__init__.py',
+              'src/re/application/commands/manual_case.py',
+              'src/re/application/queries/__init__.py',
+              'src/re/application/queries/manual_case.py',
+              'src/re/application/services/__init__.py',
+              'src/re/application/services/manual_case.py',
+              'src/re/adapters/local_service/flask_app.py',
+              'src/re/adapters/local_service/manual_case_routes.py',
+              'tests/re/test_encrypted_persistence.py',
+              'tests/re/test_manual_case_data_backbone.py',
+          }
+          actual = set(subprocess.check_output([
+              'git', 'diff', '--name-only',
+              '723409a3da60216e42cc9344afadc75c1f590d91..HEAD'
+          ], text=True).splitlines())
+          if actual != expected:
+              raise SystemExit(
+                  f'scope mismatch: extra={sorted(actual - expected)} missing={sorted(expected - actual)}'
+              )
+          print(f"bounded_changed_files={len(actual)}")
+          PY
+
+      - name: Full Epic 0 + Epic 1 regression suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pytest -q tests/re | tee /tmp/e1-pr-001-full-tests.log
+
+      - name: Focused ManualCaseDataGate suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pytest -q tests/re/test_manual_case_data_backbone.py | tee /tmp/e1-pr-001-focused-tests.log
+
+      - name: Write binding runtime evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          cat > evidence/E1-PR-001_manual_data_vectors_v1.log <<'EOF'
+          manual_case_data_gate=PASS
+          schema_version=2
+          required_appraisal_date=true
+          supported_profile_binding=true
+          subject_roundtrip=true
+          comparable_slots=1,2,3
+          exact_decimal_scale=true
+          explicit_zero_distinct_from_missing=true
+          binary_float_rejected=true
+          unsupported_profile_rejected=true
+          atomic_bundle_rollback=true
+          comparable_lineage_guard=true
+          local_service_roundtrip=true
+          local_service_direct_db_access=false
+          legacy_hash_unchanged=true
+          calculation_correctness_claim=false
+          EOF
+          cp /tmp/e1-pr-001-full-tests.log evidence/E1-PR-001_tests_v1.log
+          cp /tmp/e1-pr-001-focused-tests.log evidence/E1-PR-001_focused_tests_v1.log
+          cat > evidence/E1_PR_001_RUNTIME_EVIDENCE_v1.md <<EOF
+          # E1-PR-001 Runtime Evidence v1
+
+          **Date:** 2026-08-17  
+          **Repository:** \`Reguluspt/CEN-Value-RE\`  
+          **Implementation baseline:** \`723409a3da60216e42cc9344afadc75c1f590d91\`  
+          **Runtime-tested HEAD:** \`${TESTED_HEAD}\`  
+          **GitHub Actions run:** \`${GITHUB_RUN_ID}\`  
+          **Runner:** \`windows-latest\`  
+          **Python:** \`3.11\`
+
+          ## Result
+          - bounded implementation scope: PASS;
+          - compile / git diff check: PASS;
+          - complete accepted Epic 0 regression suite plus E1-PR-001: PASS;
+          - focused E1-PR-001 ManualCaseDataGate suite: PASS;
+          - encrypted persistence schema v2: PASS;
+          - subject + TSSS01/TSSS02/TSSS03 save/resume: PASS;
+          - exact decimal-string scale: PASS;
+          - explicit zero distinct from missing: PASS;
+          - atomic nested bundle rollback: PASS;
+          - DB-level comparable case-lineage guard: PASS;
+          - authenticated local-service application path: PASS;
+          - legacy database unchanged: PASS.
+
+          ## Claim boundary
+          This evidence proves the **Manual Case / TSTĐ / TSSS Data Backbone** only. It makes no adjustment, comparable-quality, final-valuation, workbook-generation, or Excel-qualification correctness claim.
+
+          ## Gate
+          Implementation evidence only. Independent acceptance remains required before merge or E1-PR-002.
+          EOF
+
+      - name: Repository guards and commit evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          python - <<'PY'
+          import subprocess
+          allowed = {
+              'evidence/E1_PR_001_RUNTIME_EVIDENCE_v1.md',
+              'evidence/E1-PR-001_tests_v1.log',
+              'evidence/E1-PR-001_focused_tests_v1.log',
+              'evidence/E1-PR-001_manual_data_vectors_v1.log',
+          }
+          actual = set(subprocess.check_output(['git', 'status', '--porcelain'], text=True).splitlines())
+          paths = {line[3:] for line in actual}
+          if paths != allowed:
+              raise SystemExit(f'unexpected post-test changes: {sorted(paths)}')
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add evidence/E1_PR_001_RUNTIME_EVIDENCE_v1.md \
+            evidence/E1-PR-001_tests_v1.log \
+            evidence/E1-PR-001_focused_tests_v1.log \
+            evidence/E1-PR-001_manual_data_vectors_v1.log
+          git commit -m 'E1-PR-001: record Windows runtime evidence v1'
+          git push origin HEAD:agent/e1-pr-001-manual-data-backbone
