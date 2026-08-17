@@ -137,6 +137,7 @@ MIGRATIONS = (
             """CREATE TABLE land_parcel (
                 id TEXT PRIMARY KEY,
                 property_id TEXT NOT NULL REFERENCES property(id),
+                parcel_order INTEGER NOT NULL CHECK (parcel_order > 0),
                 parcel_number TEXT,
                 map_sheet_number TEXT,
                 total_area_m2 TEXT,
@@ -145,12 +146,14 @@ MIGRATIONS = (
                 notes TEXT,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
-                archived_at TEXT
+                archived_at TEXT,
+                UNIQUE(property_id, parcel_order)
             )""",
             """CREATE TABLE land_valuation_component (
                 id TEXT PRIMARY KEY,
                 property_id TEXT NOT NULL REFERENCES property(id),
                 parcel_id TEXT REFERENCES land_parcel(id),
+                component_order INTEGER NOT NULL CHECK (component_order > 0),
                 planning_status TEXT NOT NULL CHECK (planning_status IN ('COMPLIANT','NON_COMPLIANT','UNKNOWN')),
                 area_m2 TEXT NOT NULL,
                 valuation_basis TEXT NOT NULL CHECK (valuation_basis IN ('MARKET_INDICATED','OFFICIAL_LAND_PRICE','OTHER_MANUAL_BASIS')),
@@ -160,7 +163,8 @@ MIGRATIONS = (
                 policy_version TEXT,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
-                archived_at TEXT
+                archived_at TEXT,
+                UNIQUE(parcel_id, component_order)
             )""",
             """CREATE TABLE property_characteristic (
                 id TEXT PRIMARY KEY,
@@ -194,12 +198,14 @@ MIGRATIONS = (
                 id TEXT PRIMARY KEY,
                 property_id TEXT NOT NULL REFERENCES property(id),
                 market_observation_id TEXT REFERENCES market_observation(id),
+                evidence_order INTEGER NOT NULL CHECK (evidence_order > 0),
                 evidence_type TEXT,
                 source_url TEXT,
                 note TEXT,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
-                archived_at TEXT
+                archived_at TEXT,
+                UNIQUE(property_id, evidence_order)
             )""",
             "CREATE UNIQUE INDEX uq_property_case_role_subject ON property(case_id, role) WHERE role='SUBJECT' AND archived_at IS NULL",
         ),

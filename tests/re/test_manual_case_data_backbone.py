@@ -107,6 +107,11 @@ def _comparable(case_id: str, slot: int, *, property_id: str | None = None) -> S
                 source_url=f"https://example.invalid/tsss-{slot}",
                 note=f"manual evidence {slot}",
             ),
+            EvidenceInput(
+                evidence_type="MANUAL_MARKET_NOTE",
+                source_url=f"https://example.invalid/tsss-{slot}-secondary",
+                note=f"manual evidence {slot} secondary",
+            ),
         ),
     )
 
@@ -156,6 +161,11 @@ def test_manual_case_subject_and_three_comparables_round_trip_exact_strings(tmp_
                             ),
                         ),
                     ),
+                    LandParcelInput(
+                        parcel_number="25",
+                        map_sheet_number="29/BĐĐC",
+                        total_area_m2="1.00",
+                    ),
                 ),
                 characteristics=(
                     CharacteristicInput(definition_key="frontage", decimal_value="3.900"),
@@ -166,7 +176,9 @@ def test_manual_case_subject_and_three_comparables_round_trip_exact_strings(tmp_
             )
         )
         assert subject.subject is not None
+        assert [item.parcel_number for item in subject.subject.parcels] == ["24", "25"]
         assert subject.subject.parcels[0].total_area_m2 == "103.20"
+        assert [item.component_order for item in subject.subject.land_valuation_components] == [1, 2]
         assert subject.subject.land_valuation_components[0].area_m2 == "82.9300"
         assert subject.subject.land_valuation_components[1].unit_price_vnd_per_m2 == "0.0000"
         subject_chars = {
@@ -186,6 +198,11 @@ def test_manual_case_subject_and_three_comparables_round_trip_exact_strings(tmp_
         assert resumed.comparables[0].market_observation.negotiation_rate_pct == "0.0000"
         assert resumed.comparables[1].market_observation is not None
         assert resumed.comparables[1].market_observation.negotiation_rate_pct is None
+        assert [item.evidence_order for item in resumed.comparables[0].evidence] == [1, 2]
+        assert [item.note for item in resumed.comparables[0].evidence] == [
+            "manual evidence 1",
+            "manual evidence 1 secondary",
+        ]
         before_close_json = resumed.to_json()
 
     assert hashlib.sha256(legacy.read_bytes()).hexdigest() == legacy_before
@@ -381,9 +398,12 @@ def test_migration_v2_is_explicit_ordered_backbone_extension() -> None:
         "template_profile_id",
         "property_characteristic",
         "land_parcel",
+        "parcel_order",
         "land_valuation_component",
+        "component_order",
         "market_observation",
         "evidence",
+        "evidence_order",
     ):
         assert required in joined
 

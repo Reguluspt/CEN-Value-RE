@@ -69,6 +69,7 @@ class ComparablePropertyRecord:
 class LandParcelRecord:
     id: str
     property_id: str
+    parcel_order: int
     created_at: str
     updated_at: str
     parcel_number: str | None = None
@@ -84,6 +85,7 @@ class LandParcelRecord:
 class LandValuationComponentRecord:
     id: str
     property_id: str
+    component_order: int
     planning_status: str
     area_m2: str
     valuation_basis: str
@@ -132,6 +134,7 @@ class MarketObservationRecord:
 class EvidenceRecord:
     id: str
     property_id: str
+    evidence_order: int
     created_at: str
     updated_at: str
     market_observation_id: str | None = None

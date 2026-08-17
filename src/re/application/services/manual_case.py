@@ -150,6 +150,7 @@ class ManualCaseService:
                 LandParcelRecord(
                     id=parcel_id,
                     property_id=property_id,
+                    parcel_order=index + 1,
                     created_at=existing_parcel.created_at if existing_parcel else timestamp,
                     updated_at=timestamp,
                     parcel_number=parcel.parcel_number,
@@ -184,6 +185,7 @@ class ManualCaseService:
                         id=existing_component.id if existing_component else self._new_id(),
                         property_id=property_id,
                         parcel_id=parcel_id,
+                        component_order=component_index + 1,
                         planning_status=component.planning_status,
                         area_m2=component.area_m2,
                         valuation_basis=component.valuation_basis,
@@ -305,6 +307,7 @@ class ManualCaseService:
                 EvidenceRecord(
                     id=existing_item.id if existing_item else self._new_id(),
                     property_id=property_id,
+                    evidence_order=index + 1,
                     market_observation_id=observation_id,
                     created_at=existing_item.created_at if existing_item else timestamp,
                     updated_at=timestamp,

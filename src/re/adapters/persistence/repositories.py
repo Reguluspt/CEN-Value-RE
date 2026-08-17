@@ -240,7 +240,7 @@ class SQLCipherLandParcelRepository:
 
     def list_for_property(self, property_id: str) -> tuple[LandParcelRecord, ...]:
         rows = self._connection.execute(
-            "SELECT * FROM land_parcel WHERE property_id=? ORDER BY created_at,id", (property_id,)
+            "SELECT * FROM land_parcel WHERE property_id=? ORDER BY parcel_order,id", (property_id,)
         ).fetchall()
         return tuple(LandParcelRecord(**row) for row in rows)
 
@@ -268,7 +268,11 @@ class SQLCipherLandValuationComponentRepository:
 
     def list_for_property(self, property_id: str) -> tuple[LandValuationComponentRecord, ...]:
         rows = self._connection.execute(
-            "SELECT * FROM land_valuation_component WHERE property_id=? ORDER BY created_at,id", (property_id,)
+            """SELECT c.* FROM land_valuation_component c
+            LEFT JOIN land_parcel p ON p.id=c.parcel_id
+            WHERE c.property_id=?
+            ORDER BY COALESCE(p.parcel_order, 2147483647), c.component_order, c.id""",
+            (property_id,),
         ).fetchall()
         output = []
         for row in rows:
@@ -368,7 +372,7 @@ class SQLCipherEvidenceRepository:
 
     def list_for_property(self, property_id: str) -> tuple[EvidenceRecord, ...]:
         rows = self._connection.execute(
-            "SELECT * FROM evidence WHERE property_id=? ORDER BY created_at,id", (property_id,)
+            "SELECT * FROM evidence WHERE property_id=? ORDER BY evidence_order,id", (property_id,)
         ).fetchall()
         return tuple(EvidenceRecord(**row) for row in rows)
 
