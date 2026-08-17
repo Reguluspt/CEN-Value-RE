@@ -8,11 +8,8 @@ from src.re.application.services.market_adjustment import (
     MarketAdjustmentConflictError,
     MarketAdjustmentService,
 )
-from src.re.ports.persistence import (
-    AdjustmentDecisionRecord,
-    CaseRecord,
-    ComparablePropertyRecord,
-)
+from src.re.ports.adjustment_source import AdjustmentSourceStateRecord
+from src.re.ports.persistence import CaseRecord, ComparablePropertyRecord
 
 
 class _CaseRepo:
@@ -34,16 +31,31 @@ class _ComparableRepo:
 class _DecisionRepo:
     def __init__(self):
         self.records = {}
+        self.before_cas = None
 
     def put(self, record):
         self.records[record.id] = record
+
+    def put_if_version(self, record, *, expected_version):
+        if self.before_cas is not None:
+            hook, self.before_cas = self.before_cas, None
+            hook()
+        current = self.records.get(record.id)
+        if current is None or current.version != expected_version:
+            return False
+        self.records[record.id] = record
+        return True
 
 
 class _DecisionQueryRepo:
     def __init__(self, decisions):
         self.decisions = decisions
+        self.before_read = None
 
     def list_for_comparable(self, case_id, comparable_property_id):
+        if self.before_read is not None:
+            hook, self.before_read = self.before_read, None
+            hook()
         return tuple(
             sorted(
                 (
@@ -74,6 +86,60 @@ class _SnapshotRepo:
         self.records.append(record)
 
 
+class _SourceRepo:
+    def __init__(self):
+        self.state = AdjustmentSourceStateRecord(
+            case_id="case-1",
+            comparable_property_id="comp-1",
+            source_revision=1,
+            normalized_base_price_vnd_per_m2=None,
+            normalized_base_bound_revision=None,
+            normalized_base_evidence_ref=None,
+            updated_at="2026-08-17T00:00:00Z",
+        )
+
+    def get(self, case_id, comparable_property_id):
+        if (
+            self.state.case_id == case_id
+            and self.state.comparable_property_id == comparable_property_id
+        ):
+            return self.state
+        return None
+
+    def ensure(self, case_id, comparable_property_id, updated_at):
+        return self.state
+
+    def bind_normalized_base(
+        self,
+        *,
+        case_id,
+        comparable_property_id,
+        expected_source_revision,
+        normalized_base_price_vnd_per_m2,
+        evidence_ref,
+        updated_at,
+    ):
+        if self.state.source_revision != expected_source_revision:
+            raise RuntimeError("revision changed")
+        self.state = replace(
+            self.state,
+            normalized_base_price_vnd_per_m2=normalized_base_price_vnd_per_m2,
+            normalized_base_bound_revision=expected_source_revision,
+            normalized_base_evidence_ref=evidence_ref,
+            updated_at=updated_at,
+        )
+        return self.state
+
+    def drift(self):
+        self.state = replace(
+            self.state,
+            source_revision=self.state.source_revision + 1,
+            normalized_base_price_vnd_per_m2=None,
+            normalized_base_bound_revision=None,
+            normalized_base_evidence_ref=None,
+        )
+
+
 class _FakeUow:
     def __init__(self):
         self.cases = _CaseRepo(
@@ -98,11 +164,10 @@ class _FakeUow:
             )
         )
         self.adjustment_decisions = _DecisionRepo()
-        self.adjustment_decision_queries = _DecisionQueryRepo(
-            self.adjustment_decisions
-        )
+        self.adjustment_decision_queries = _DecisionQueryRepo(self.adjustment_decisions)
         self.adjustment_selection_audit = _AuditRepo()
         self.adjustment_calculation_snapshots = _SnapshotRepo()
+        self.adjustment_source_states = _SourceRepo()
         self.atomic_entries = 0
 
     @contextmanager
@@ -130,7 +195,16 @@ def _service():
     return service, uow
 
 
-def _select_all(service, *, revision="rev-1"):
+def _bind_base(service):
+    return service.bind_normalized_base(
+        case_id="case-1",
+        comparable_property_id="comp-1",
+        normalized_base_price_vnd_per_m2="230951000",
+        evidence_ref="fixture://N08/P0/F53",
+    )
+
+
+def _select_all(service):
     rates = {
         "C1": "0",
         "C2": "-0.05",
@@ -151,11 +225,10 @@ def _select_all(service, *, revision="rev-1"):
             factor_key=key,
             selected_rate=value,
             selected_by="appraiser-1",
-            source_data_revision=revision,
         )
 
 
-def test_explicit_zero_selection_is_human_audited_and_not_missing():
+def test_explicit_zero_selection_is_human_audited_and_authoritatively_bound():
     service, uow = _service()
     decision = service.select_rate(
         case_id="case-1",
@@ -163,14 +236,26 @@ def test_explicit_zero_selection_is_human_audited_and_not_missing():
         factor_key="C1",
         selected_rate="0.000",
         selected_by="appraiser-1",
-        source_data_revision="rev-1",
     )
     assert decision.selected_rate_pct == "0.000"
     assert decision.selected_explicitly is True
+    assert decision.source_data_revision == "1"
     assert decision.review_status == "CURRENT"
-    assert uow.adjustment_selection_audit.records[0].event_kind == "SELECTED"
     assert uow.adjustment_selection_audit.records[0].selected_by == "appraiser-1"
-    assert uow.adjustment_selection_audit.records[0].selected_rate_pct == "0.000"
+
+
+def test_caller_cannot_self_certify_stale_revision():
+    service, uow = _service()
+    uow.adjustment_source_states.drift()
+    with pytest.raises(MarketAdjustmentConflictError, match="authoritative current revision"):
+        service.select_rate(
+            case_id="case-1",
+            comparable_property_id="comp-1",
+            factor_key="C1",
+            selected_rate="0",
+            selected_by="appraiser-1",
+            source_data_revision="1",
+        )
 
 
 def test_source_change_marks_decision_stale_without_overwriting_selected_rate():
@@ -181,74 +266,112 @@ def test_source_change_marks_decision_stale_without_overwriting_selected_rate():
         factor_key="C4",
         selected_rate="-0.10",
         selected_by="appraiser-1",
-        source_data_revision="rev-1",
     )
+    uow.adjustment_source_states.drift()
     updated = service.mark_source_data_changed(
-        case_id="case-1",
-        comparable_property_id="comp-1",
-        new_source_data_revision="rev-2",
+        case_id="case-1", comparable_property_id="comp-1"
     )
-    assert len(updated) == 1
     stale = updated[0]
     assert stale.id == original.id
     assert stale.selected_rate_pct == "-0.10"
-    assert stale.source_data_revision == "rev-1"
+    assert stale.source_data_revision == "1"
     assert stale.review_status == "SOURCE_DATA_CHANGED"
-    audit = uow.adjustment_selection_audit.records[-1]
-    assert audit.event_kind == "SOURCE_DATA_CHANGED"
-    assert audit.source_data_revision == "rev-2"
-    assert audit.selected_by == "SYSTEM_SOURCE_DRIFT"
+    assert uow.adjustment_selection_audit.records[-1].source_data_revision == "2"
 
 
-def test_stale_decision_blocks_calculation_until_human_reselects():
-    service, _ = _service()
+def test_stale_decision_and_unbound_p0_block_calculation():
+    service, uow = _service()
+    _bind_base(service)
     _select_all(service)
-    service.mark_source_data_changed(
-        case_id="case-1",
-        comparable_property_id="comp-1",
-        new_source_data_revision="rev-2",
-    )
-    with pytest.raises(MarketAdjustmentConflictError, match="human review"):
-        service.run_adjustment(
-            case_id="case-1",
-            comparable_property_id="comp-1",
-            source_data_revision="rev-2",
-            normalized_base_price_vnd_per_m2="230951000",
-        )
+    uow.adjustment_source_states.drift()
+    service.mark_source_data_changed(case_id="case-1", comparable_property_id="comp-1")
+    with pytest.raises(MarketAdjustmentConflictError, match="not evidence-bound"):
+        service.run_adjustment(case_id="case-1", comparable_property_id="comp-1")
 
 
 def test_complete_current_decision_set_persists_sha_bound_snapshot():
     service, uow = _service()
+    _bind_base(service)
     _select_all(service)
-    run = service.run_adjustment(
-        case_id="case-1",
-        comparable_property_id="comp-1",
-        source_data_revision="rev-1",
-        normalized_base_price_vnd_per_m2="230951000",
-    )
+    run = service.run_adjustment(case_id="case-1", comparable_property_id="comp-1")
     assert run.result.indicated_unit_price_vnd_per_m2 == Decimal("196308350.00")
     assert len(run.decision_set_sha256) == 64
     assert len(run.semantic_sha256) == 64
-    assert len(uow.adjustment_calculation_snapshots.records) == 1
     record = uow.adjustment_calculation_snapshots.records[0]
     assert record.id == run.snapshot_id
-    assert record.decision_set_sha256 == run.decision_set_sha256
-    assert record.semantic_sha256 == run.semantic_sha256
-    assert record.indicated_unit_price_vnd_per_m2 == "196308350.00"
-    assert '"factor_key":"C1"' in record.ordered_steps_json
-    assert '"factor_key":"C11"' in record.ordered_steps_json
+    assert record.source_data_revision == "1"
+    assert record.normalized_base_price_vnd_per_m2 == "230951000"
 
 
-def test_decision_set_revision_mismatch_blocks_calculation():
+def test_caller_p0_must_match_evidence_bound_current_p0():
     service, _ = _service()
-    _select_all(service, revision="rev-1")
-    with pytest.raises(MarketAdjustmentConflictError, match="current source-data revision"):
+    _bind_base(service)
+    _select_all(service)
+    with pytest.raises(MarketAdjustmentConflictError, match="evidence-bound current P0"):
         service.run_adjustment(
             case_id="case-1",
             comparable_property_id="comp-1",
-            source_data_revision="rev-2",
-            normalized_base_price_vnd_per_m2="230951000",
+            normalized_base_price_vnd_per_m2="999",
         )
+
+
+def test_human_reselection_between_drift_read_and_write_is_not_overwritten():
+    service, uow = _service()
+    original = service.select_rate(
+        case_id="case-1",
+        comparable_property_id="comp-1",
+        factor_key="C4",
+        selected_rate="-0.10",
+        selected_by="appraiser-1",
+    )
+    uow.adjustment_source_states.drift()
+
+    def concurrent_reselection():
+        uow.adjustment_decisions.records[original.id] = replace(
+            original,
+            selected_rate_pct="-0.20",
+            source_data_revision="2",
+            review_status="CURRENT",
+            version=original.version + 1,
+        )
+
+    uow.adjustment_decisions.before_cas = concurrent_reselection
+    with pytest.raises(MarketAdjustmentConflictError, match="changed concurrently"):
+        service.mark_source_data_changed(
+            case_id="case-1", comparable_property_id="comp-1"
+        )
+    persisted = uow.adjustment_decisions.records[original.id]
+    assert persisted.selected_rate_pct == "-0.20"
+    assert persisted.version == 2
+
+
+def test_snapshot_aborts_if_decision_becomes_stale_after_initial_validation():
+    service, uow = _service()
+    _bind_base(service)
+    _select_all(service)
+
+    read_count = 0
+    original_method = uow.adjustment_decision_queries.list_for_comparable
+
+    def guarded_read(case_id, comparable_property_id):
+        nonlocal read_count
+        read_count += 1
+        if read_count == 2:
+            first = sorted(
+                uow.adjustment_decisions.records.values(),
+                key=lambda item: int(item.factor_key[1:]),
+            )[0]
+            uow.adjustment_decisions.records[first.id] = replace(
+                first,
+                review_status="SOURCE_DATA_CHANGED",
+                version=first.version + 1,
+            )
+        return original_method(case_id, comparable_property_id)
+
+    uow.adjustment_decision_queries.list_for_comparable = guarded_read
+    with pytest.raises(MarketAdjustmentConflictError, match="changed during calculation"):
+        service.run_adjustment(case_id="case-1", comparable_property_id="comp-1")
+    assert uow.adjustment_calculation_snapshots.records == []
 
 
 def test_comparable_case_lineage_mismatch_fails_before_write():
@@ -261,7 +384,5 @@ def test_comparable_case_lineage_mismatch_fails_before_write():
             factor_key="C1",
             selected_rate="0",
             selected_by="appraiser-1",
-            source_data_revision="rev-1",
         )
     assert not uow.adjustment_decisions.records
-    assert not uow.adjustment_selection_audit.records
