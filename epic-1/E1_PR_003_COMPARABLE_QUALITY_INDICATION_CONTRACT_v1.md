@@ -1,7 +1,7 @@
 # E1-PR-003 — Comparable Quality + 15% Readiness + Human Indication Contract v1
 
-**Status:** IMPLEMENTATION CONTRACT — EPIC 1  
-**Baseline:** `7e60be157e6b0d5300ffaa8dabac1aadc73f96fb`  
+**Status:** IMPLEMENTATION CONTRACT — EPIC 1
+**Baseline:** `7e60be157e6b0d5300ffaa8dabac1aadc73f96fb`
 **Gate:** `HumanIndicationGate`
 
 ## 1. Authority
