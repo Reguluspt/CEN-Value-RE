@@ -1,6 +1,7 @@
 import hashlib
 import json
 import sqlite3
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -40,8 +41,11 @@ def _connection():
 
 def _seed_three_comparables(connection):
     connection.execute(
-        """INSERT INTO appraisal_case(id,case_code,status,created_at,updated_at)
-        VALUES ('case-1','CV-E1-003','IN_PROGRESS','t','t')"""
+        """INSERT INTO appraisal_case(
+            id,case_code,status,created_at,updated_at,
+            template_profile_id,template_profile_version
+        ) VALUES ('case-1','CV-E1-003','IN_PROGRESS','t','t',
+            'cenvalue-re-n08-0038-v1','1')"""
     )
     for index in range(1, 4):
         comp_id = f"comp-{index}"
@@ -112,10 +116,13 @@ def _recompute_human_semantic_sha(snapshot, sources):
         "rounded_indicated_unit_price_vnd_per_m2": snapshot.rounded_indicated_unit_price_vnd_per_m2,
         "rounding": {
             "target": snapshot.rounding_target,
+            "mode": snapshot.rounding_mode,
             "increment_vnd": snapshot.rounding_increment_vnd,
             "source": snapshot.rounding_source,
             "profile_id": snapshot.rounding_profile_id,
             "profile_version": snapshot.rounding_profile_version,
+            "selected_by": snapshot.rounding_selected_by,
+            "selected_at": snapshot.rounding_selected_at,
         },
         "confirmed_by": snapshot.confirmed_by,
         "confirmed_at": snapshot.confirmed_at,
@@ -126,7 +133,7 @@ def _recompute_human_semantic_sha(snapshot, sources):
                 "adjustment_snapshot_id": item.adjustment_snapshot_id,
                 "adjustment_semantic_sha256": item.adjustment_semantic_sha256,
             }
-            for item in sources
+            for item in sorted(sources, key=lambda current: current.comparable_property_id)
         ],
         "quality": json.loads(snapshot.quality_snapshot_json),
         "readiness": json.loads(snapshot.readiness_snapshot_json),
@@ -154,6 +161,17 @@ def test_schema_v4_creates_append_only_human_indication_evidence():
         }
         assert "human_indication_snapshot" in names
         assert "human_indication_source" in names
+        columns = {
+            row["name"]
+            for row in connection.execute(
+                "PRAGMA table_info(human_indication_snapshot)"
+            )
+        }
+        assert {
+            "rounding_mode",
+            "rounding_selected_by",
+            "rounding_selected_at",
+        }.issubset(columns)
         triggers = {
             row["name"]
             for row in connection.execute(
@@ -219,14 +237,94 @@ def test_golden_preview_and_human_confirmation_match_g18_h119():
 
         persisted = uow.human_indication_snapshots.get("human-1")
         assert persisted is not None
-        assert persisted.raw_indicated_unit_price_vnd_per_m2 == "196308350.00" or persisted.raw_indicated_unit_price_vnd_per_m2 == "196308350"
+        assert persisted.raw_indicated_unit_price_vnd_per_m2 in {
+            "196308350.00",
+            "196308350",
+        }
         assert persisted.rounded_indicated_unit_price_vnd_per_m2 == "196308000"
+        assert persisted.rounding_target == "UNIT_PRICE"
+        assert persisted.rounding_mode == "NEAREST"
+        assert persisted.rounding_source == "TEMPLATE_DEFAULT"
+        assert persisted.rounding_selected_by is None
+        assert persisted.rounding_selected_at is None
         sources = uow.human_indication_sources.list_for_snapshot("human-1")
         assert len(sources) == 3
         assert {item.adjustment_snapshot_id for item in sources} == {
             item.snapshot_id for item in source_runs
         }
         assert _recompute_human_semantic_sha(persisted, sources) == persisted.semantic_sha256
+        assert service.resolve_current_indication(case_id="case-1") == persisted
+    finally:
+        connection.close()
+
+
+def test_case_override_rounding_metadata_is_audited_in_confirmation_snapshot():
+    connection = _connection()
+    try:
+        schema_version = apply_migrations(connection)
+        _seed_three_comparables(connection)
+        uow = SQLCipherUnitOfWork(connection, schema_version)
+        _build_golden_adjustment_evidence(uow)
+        selected_at = datetime(2026, 8, 17, 13, 35, tzinfo=timezone.utc)
+        policy = RoundingPolicy(
+            target=UNIT_PRICE_TARGET,
+            increment_vnd=10000,
+            source=RoundingSource.CASE_OVERRIDE,
+            profile_id="cenvalue-re-n08-0038-v1",
+            profile_version="1",
+            selected_by="rounding-appraiser",
+            selected_at=selected_at,
+        )
+        service = ComparableQualityService(
+            uow,
+            now=lambda: "2026-08-17T13:36:00Z",
+            new_id=lambda: "human-case-rounding",
+        )
+        result = service.confirm_indication(
+            case_id="case-1",
+            selection_kind="COMPARABLE",
+            selected_comparable_property_id="comp-1",
+            confirmed_by="final-appraiser",
+            reason="Case-level rounding override reviewed",
+            rounding_policy=policy,
+        )
+        assert result.raw_indicated_unit_price_vnd_per_m2 == 196308350
+        assert result.rounded_indicated_unit_price_vnd_per_m2 == 196310000
+        persisted = uow.human_indication_snapshots.get("human-case-rounding")
+        assert persisted is not None
+        assert persisted.rounding_source == "CASE_OVERRIDE"
+        assert persisted.rounding_mode == "NEAREST"
+        assert persisted.rounding_increment_vnd == 10000
+        assert persisted.rounding_selected_by == "rounding-appraiser"
+        assert persisted.rounding_selected_at == selected_at.isoformat()
+    finally:
+        connection.close()
+
+
+def test_template_default_rounding_must_match_case_profile():
+    connection = _connection()
+    try:
+        schema_version = apply_migrations(connection)
+        _seed_three_comparables(connection)
+        uow = SQLCipherUnitOfWork(connection, schema_version)
+        _build_golden_adjustment_evidence(uow)
+        service = ComparableQualityService(uow)
+        wrong_profile = RoundingPolicy(
+            target=UNIT_PRICE_TARGET,
+            increment_vnd=1000,
+            source=RoundingSource.TEMPLATE_DEFAULT,
+            profile_id="other-profile",
+            profile_version="1",
+        )
+        with pytest.raises(ComparableQualityConflictError, match="case profile"):
+            service.confirm_indication(
+                case_id="case-1",
+                selection_kind="COMPARABLE",
+                selected_comparable_property_id="comp-1",
+                confirmed_by="appraiser",
+                reason="attempted wrong profile",
+                rounding_policy=wrong_profile,
+            )
     finally:
         connection.close()
 
