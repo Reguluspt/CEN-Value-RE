@@ -5,7 +5,13 @@ from pathlib import Path
 
 import pytest
 
-from src.re.application.services.final_valuation import FinalValuationConflictError
+from src.re.adapters.excel.rounding_defaults import SUPPORTED_TEMPLATE_ROUNDING_DEFAULTS
+from src.re.adapters.persistence.migrations import apply_migrations
+from src.re.adapters.persistence.store import SQLCipherUnitOfWork
+from src.re.application.services.final_valuation import (
+    FinalValuationConflictError,
+    FinalValuationService,
+)
 
 
 _HELPER_PATH = Path(__file__).with_name("test_final_valuation_service.py")
@@ -13,6 +19,26 @@ _SPEC = importlib.util.spec_from_file_location("_e1pr004_service_helpers", _HELP
 assert _SPEC is not None and _SPEC.loader is not None
 _HELPERS = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(_HELPERS)
+
+
+def _prepared_final_service(connection, ids):
+    schema_version = apply_migrations(connection)
+    _HELPERS._seed_case_subject_and_comparables(connection)
+    uow = SQLCipherUnitOfWork(connection, schema_version)
+    market = _HELPERS._build_upstream_evidence(uow)
+    service = FinalValuationService(
+        uow,
+        template_rounding_defaults=SUPPORTED_TEMPLATE_ROUNDING_DEFAULTS,
+        now=lambda: "2026-08-17T15:20:00Z",
+        new_id=ids.__next__,
+    )
+    service.bind_supplied_construction_aggregate(
+        case_id="case-1",
+        amount_vnd="1152970000",
+        evidence_ref="source://construction/A",
+        supplied_by="appraiser",
+    )
+    return uow, market, service
 
 
 def _recompute_final_sha(snapshot):
@@ -57,7 +83,7 @@ def _recompute_final_sha(snapshot):
 def test_final_snapshot_semantic_sha_is_reconstructable_from_immutable_snapshot():
     connection = _HELPERS._connection()
     try:
-        uow, _, service = _HELPERS._prepared_final_service(
+        uow, _, service = _prepared_final_service(
             connection, iter(("construction-1", "valuation-1"))
         )
         service.compose(
@@ -74,7 +100,7 @@ def test_final_snapshot_semantic_sha_is_reconstructable_from_immutable_snapshot(
 def test_appraisal_date_drift_invalidates_current_final_snapshot():
     connection = _HELPERS._connection()
     try:
-        _, _, service = _HELPERS._prepared_final_service(
+        _, _, service = _prepared_final_service(
             connection, iter(("construction-1", "valuation-1"))
         )
         service.compose(
@@ -94,7 +120,7 @@ def test_appraisal_date_drift_invalidates_current_final_snapshot():
 def test_template_profile_drift_invalidates_template_default_final_snapshot():
     connection = _HELPERS._connection()
     try:
-        _, _, service = _HELPERS._prepared_final_service(
+        _, _, service = _prepared_final_service(
             connection, iter(("construction-1", "valuation-1"))
         )
         service.compose(
@@ -114,7 +140,7 @@ def test_template_profile_drift_invalidates_template_default_final_snapshot():
 def test_upstream_human_indication_drift_invalidates_current_final_snapshot():
     connection = _HELPERS._connection()
     try:
-        _, market, service = _HELPERS._prepared_final_service(
+        _, market, service = _prepared_final_service(
             connection, iter(("construction-1", "valuation-1"))
         )
         service.compose(
