@@ -4,6 +4,7 @@ import sqlite3
 
 import pytest
 
+from src.re.adapters.excel import SUPPORTED_TEMPLATE_ROUNDING_DEFAULTS
 from src.re.adapters.persistence.migrations import apply_migrations
 from src.re.adapters.persistence.store import SQLCipherUnitOfWork
 from src.re.application.services.comparable_quality import (
@@ -27,6 +28,14 @@ def _connection():
     connection.row_factory = _dict_factory
     connection.execute("PRAGMA foreign_keys=ON")
     return connection
+
+
+def _quality_service(uow, **kwargs):
+    return ComparableQualityService(
+        uow,
+        template_rounding_defaults=SUPPORTED_TEMPLATE_ROUNDING_DEFAULTS,
+        **kwargs,
+    )
 
 
 def _seed_case(connection):
@@ -141,7 +150,7 @@ def test_zero_gross_tie_average_is_supported_only_after_current_adjustment_runs(
             _select_all(market, comp_id, c2=c2)
             market.run_adjustment(case_id="case-1", comparable_property_id=comp_id)
 
-        service = ComparableQualityService(
+        service = _quality_service(
             uow,
             now=lambda: "2026-08-17T14:01:00Z",
             new_id=lambda: "human-zero-tie",
@@ -195,7 +204,7 @@ def test_confirmed_human_snapshot_stays_reproducible_but_is_not_current_after_so
             _select_all(market, comp_id)
             market.run_adjustment(case_id="case-1", comparable_property_id=comp_id)
 
-        service = ComparableQualityService(
+        service = _quality_service(
             uow,
             now=lambda: "2026-08-17T14:11:00Z",
             new_id=lambda: "human-before-drift",
