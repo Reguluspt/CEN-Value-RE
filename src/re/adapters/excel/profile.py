@@ -118,6 +118,32 @@ class ExternalLinkPolicy:
 
 
 @dataclass(frozen=True, slots=True)
+class TemplateRoundingDefault:
+    """Trusted rounding default declared by one frozen template profile."""
+
+    target: str
+    mode: str
+    increment_vnd: int | None
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.target, str) or not self.target.strip():
+            raise ValueError("rounding target must be a non-empty string")
+        if self.target != self.target.strip():
+            raise ValueError("rounding target must be trimmed")
+        if not isinstance(self.mode, str) or not self.mode.strip():
+            raise ValueError("rounding mode must be a non-empty string")
+        if self.mode != self.mode.strip():
+            raise ValueError("rounding mode must be trimmed")
+        if self.increment_vnd is not None:
+            if isinstance(self.increment_vnd, bool) or not isinstance(
+                self.increment_vnd, int
+            ):
+                raise TypeError("rounding increment must be a whole-VND integer or None")
+            if self.increment_vnd <= 0:
+                raise ValueError("rounding increment must be positive")
+
+
+@dataclass(frozen=True, slots=True)
 class ExcelTemplateProfile:
     """Immutable compatibility profile.
 
@@ -134,6 +160,7 @@ class ExcelTemplateProfile:
     cell_rules: tuple[CellRule, ...] = ()
     compatibility_transformations: tuple[CompatibilityTransformation, ...] = ()
     required_controls: tuple[str, ...] = ()
+    rounding_defaults: tuple[TemplateRoundingDefault, ...] = ()
     external_link_policy: ExternalLinkPolicy = ExternalLinkPolicy(
         allowed_states=frozenset({ExternalLinkState.NONE})
     )
@@ -174,6 +201,10 @@ class ExcelTemplateProfile:
         if len(set(self.required_controls)) != len(self.required_controls):
             raise ValueError("required controls must be unique")
 
+        rounding_targets = [item.target for item in self.rounding_defaults]
+        if len(set(rounding_targets)) != len(rounding_targets):
+            raise ValueError("rounding-default targets must be unique")
+
         for value in (
             self.source_sheet_state_sha256,
             self.source_formula_checkpoint_sha256,
@@ -199,3 +230,9 @@ class ExcelTemplateProfile:
                 if item.cell == cell
             )
         return tuple(alternatives)
+
+    def rounding_default_for(self, target: str) -> TemplateRoundingDefault | None:
+        for default in self.rounding_defaults:
+            if default.target == target:
+                return default
+        return None
