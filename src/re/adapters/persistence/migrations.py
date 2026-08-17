@@ -427,10 +427,13 @@ MIGRATIONS = (
                 raw_indicated_unit_price_vnd_per_m2 TEXT NOT NULL,
                 rounded_indicated_unit_price_vnd_per_m2 TEXT NOT NULL,
                 rounding_target TEXT NOT NULL CHECK (rounding_target='UNIT_PRICE'),
+                rounding_mode TEXT NOT NULL CHECK (rounding_mode='NEAREST'),
                 rounding_increment_vnd INTEGER CHECK (rounding_increment_vnd IS NULL OR rounding_increment_vnd > 0),
-                rounding_source TEXT NOT NULL,
+                rounding_source TEXT NOT NULL CHECK (rounding_source IN ('TEMPLATE_DEFAULT','CASE_OVERRIDE','APPLICATION_DEFAULT')),
                 rounding_profile_id TEXT,
                 rounding_profile_version TEXT,
+                rounding_selected_by TEXT,
+                rounding_selected_at TEXT,
                 confirmed_by TEXT NOT NULL CHECK (length(trim(confirmed_by)) > 0),
                 confirmed_at TEXT NOT NULL,
                 reason TEXT NOT NULL CHECK (length(trim(reason)) > 0),
@@ -442,6 +445,21 @@ MIGRATIONS = (
                     (selection_kind='COMPARABLE' AND selected_comparable_property_id IS NOT NULL)
                     OR
                     (selection_kind='ZERO_GROSS_AVERAGE' AND selected_comparable_property_id IS NULL)
+                ),
+                CHECK (
+                    (rounding_profile_id IS NULL AND rounding_profile_version IS NULL)
+                    OR
+                    (length(trim(rounding_profile_id)) > 0 AND length(trim(rounding_profile_version)) > 0)
+                ),
+                CHECK (
+                    (rounding_source='CASE_OVERRIDE'
+                     AND rounding_selected_by IS NOT NULL
+                     AND length(trim(rounding_selected_by)) > 0
+                     AND rounding_selected_at IS NOT NULL)
+                    OR
+                    (rounding_source!='CASE_OVERRIDE'
+                     AND rounding_selected_by IS NULL
+                     AND rounding_selected_at IS NULL)
                 )
             )""",
             """CREATE TRIGGER human_indication_snapshot_lineage_guard
