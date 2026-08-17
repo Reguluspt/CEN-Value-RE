@@ -1,4 +1,4 @@
-# rerun after contract UTF-8/whitespace repair
+# binding candidate after COM runtime boundary correction
 name: E0-PR-008 Excel Qualification verification
 
 on:
@@ -56,8 +56,9 @@ jobs:
               'requirements-re.txt',
               'src/re/ports/excel_qualification.py',
               'src/re/application/services/excel_qualification.py',
-              'src/re/adapters/excel/com_runner.py',
-              'src/re/adapters/excel/qualification_cli.py',
+              'src/re/adapters/excel_qualification/__init__.py',
+              'src/re/adapters/excel_qualification/com_runner.py',
+              'src/re/adapters/excel_qualification/qualification_cli.py',
               'tests/re/test_excel_qualification_harness.py',
           }
           changed = set(subprocess.check_output([
@@ -81,7 +82,7 @@ jobs:
           set -euo pipefail
           printf 'not-a-real-workbook' > e0pr008-dummy.xlsx
           set +e
-          python -m src.re.adapters.excel.qualification_cli \
+          python -m src.re.adapters.excel_qualification.qualification_cli \
             --workbook e0pr008-dummy.xlsx \
             --profile-id cenvalue-re-n08-0038-v1 \
             --profile-version 1 \
@@ -98,7 +99,7 @@ jobs:
           import json
           from hashlib import sha256
           from pathlib import Path
-          from src.re.adapters.excel.com_runner import WindowsExcelCOMRunner
+          from src.re.adapters.excel_qualification.com_runner import WindowsExcelCOMRunner
 
           report = json.loads(Path('e0pr008-report.json').read_text(encoding='utf-8'))
           probe = WindowsExcelCOMRunner().probe()
@@ -157,6 +158,7 @@ jobs:
           - bounded scope / git diff check: PASS
           - full \`tests/re\` foundation regressions: PASS
           - E0-PR-008 focused tests: PASS
+          - E0-PR-004 Excel profile/runtime-dependency guard: PASS
           - pywin32 COM library import on Windows: PASS
           - Microsoft Excel Desktop availability on hosted runner: UNAVAILABLE
           - qualification CLI return code: \`2\` / \`NOT_QUALIFIED\`
