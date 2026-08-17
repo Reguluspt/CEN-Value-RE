@@ -16,6 +16,18 @@ _FACTOR_ORDER_SQL = "CASE factor_key " + " ".join(
 ) + " ELSE 999 END"
 
 
+def _insert(connection, sql: str, params: tuple[object, ...]) -> None:
+    outer_transaction = bool(getattr(connection, "in_transaction", False))
+    try:
+        connection.execute(sql, params)
+        if not outer_transaction:
+            connection.commit()
+    except Exception:
+        if not outer_transaction:
+            connection.rollback()
+        raise
+
+
 class SQLCipherAdjustmentDecisionQueryRepository:
     def __init__(self, connection) -> None:
         self._connection = connection
@@ -44,12 +56,11 @@ class SQLCipherAdjustmentSelectionAuditRepository:
         values = asdict(record)
         values["selected_explicitly"] = int(record.selected_explicitly)
         columns = tuple(values)
-        self._connection.execute(
+        _insert(
+            self._connection,
             f"INSERT INTO adjustment_selection_audit ({','.join(columns)}) VALUES ({','.join('?' for _ in columns)})",
             tuple(values[name] for name in columns),
         )
-        if not bool(getattr(self._connection, "in_transaction", False)):
-            self._connection.commit()
 
     def list_for_decision(
         self, adjustment_decision_id: str
@@ -73,12 +84,11 @@ class SQLCipherAdjustmentCalculationSnapshotRepository:
     def add(self, record: AdjustmentCalculationSnapshotRecord) -> None:
         values = asdict(record)
         columns = tuple(values)
-        self._connection.execute(
+        _insert(
+            self._connection,
             f"INSERT INTO adjustment_calculation_snapshot ({','.join(columns)}) VALUES ({','.join('?' for _ in columns)})",
             tuple(values[name] for name in columns),
         )
-        if not bool(getattr(self._connection, "in_transaction", False)):
-            self._connection.commit()
 
     def get(self, record_id: str) -> AdjustmentCalculationSnapshotRecord | None:
         row = self._connection.execute(
