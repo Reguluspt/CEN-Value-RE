@@ -1,5 +1,5 @@
 import json
-from decimal import Decimal
+from decimal import Decimal, localcontext
 from pathlib import Path
 
 import pytest
@@ -107,9 +107,12 @@ def test_zero_rates_are_valid_but_excluded_from_count_and_amplitude():
 
 def test_golden_readiness_is_ready_and_uses_arithmetic_average():
     readiness = evaluate_15_percent_readiness(_golden_metrics())
-    assert readiness.average_indicated_unit_price_vnd_per_m2 == Decimal(
-        "211864413.3333333333333333333333333333333333333333333333333333333333333333333333333333333333333333"
-    )
+    with localcontext() as context:
+        context.prec = 100
+        expected_average = (
+            Decimal("196308350") + Decimal("227083250") + Decimal("212201640")
+        ) / Decimal(3)
+    assert readiness.average_indicated_unit_price_vnd_per_m2 == expected_average
     assert readiness.status == "READY"
     assert all(item.within_15_percent for item in readiness.items)
 
