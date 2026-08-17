@@ -23,10 +23,13 @@ class HumanIndicationSnapshotRecord:
     raw_indicated_unit_price_vnd_per_m2: str
     rounded_indicated_unit_price_vnd_per_m2: str
     rounding_target: str
+    rounding_mode: str
     rounding_increment_vnd: int | None
     rounding_source: str
     rounding_profile_id: str | None
     rounding_profile_version: str | None
+    rounding_selected_by: str | None
+    rounding_selected_at: str | None
     confirmed_by: str
     confirmed_at: str
     reason: str
