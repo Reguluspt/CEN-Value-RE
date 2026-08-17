@@ -4,81 +4,56 @@
 **Repository:** `Reguluspt/CEN-Value-RE`
 **Accepted base:** `c4e5753c328443e63ce474c03ecbbbf31a2370ed`
 **Original review HEAD:** `e197ab72a65fe3c2308cad2d866eba704b7e3424`
-**Corrective runtime-tested HEAD:** `74670edb9c5ece5cbd94706808272d6e08a2ee57`
-**Binding corrective GitHub Actions run:** `32017538546`
+**Corrective-1 review HEAD:** `78cd4c08ba1d6e4d52d8809655deb8316125f55c`
+**Corrective-2 runtime-tested HEAD:** `0bfa7fef058541d93d5e546ea874325012cef140`
+**Binding corrective-2 GitHub Actions run:** `32030676413`
 **Runner:** Microsoft Windows Server 2025
 **Python:** `3.11.9`
 
 ## 1. Binding result
 
-Run `32017538546` completed SUCCESS against corrective implementation HEAD `74670edb9c5ece5cbd94706808272d6e08a2ee57`.
+Run `32030676413` completed successfully with branch head `0bfa7fef058541d93d5e546ea874325012cef140`.
 
 - dependency install: PASS;
-- `git diff --check c4e5753...HEAD`: PASS;
-- `python -m compileall -q src/re`: PASS;
-- full `tests/re`: **184 passed in 3.35s**;
-- focused E1-PR-002 corrective suite: **34 passed in 0.18s**.
+- diff hygiene: PASS;
+- source compile: PASS;
+- full `tests/re`: **186 passed in 3.13s**;
+- focused E1-PR-002 corrective-2 suite: **36 passed in 0.20s**.
 
-Runtime dependency set:
+Runtime dependencies remained Flask `3.1.1`, sqlcipher3 `0.6.2`, pywin32 `312`, and pytest `9.1.1`.
 
-- Flask `3.1.1`;
-- sqlcipher3 `0.6.2`;
-- pywin32 `312`;
-- pytest `9.1.1`.
+## 2. Corrective-2 finding coverage
 
-## 2. Corrective findings covered
+### E1PR002-IR-001 — material P0 rebind
 
-This binding run includes tests for all three independent-review findings returned against `e197ab72a...`.
+A first P0/evidence binding attaches to the current authoritative source revision. Repeating the identical binding is idempotent. A materially different P0/evidence binding atomically advances source revision, preserves selected rates, marks CURRENT C1–C11 decisions `SOURCE_DATA_CHANGED`, appends drift audit evidence, and blocks calculation until human reselection on the new revision.
 
-### E1PR002-IR-001 — authoritative source revision
+### E1PR002-IR-004 — immutable source-drift audit
 
-- adjustment source state is persisted server-side;
-- source revision is not caller-authoritative;
-- accepted comparable/market-observation/characteristic writes advance source revision and stale prior CURRENT decisions transactionally;
-- the normalized P0/base input is bound to the authoritative source revision and is invalidated when source data changes;
-- replay of an old caller revision cannot authorize a calculation.
+Canonical comparable/market-observation/characteristic drift now appends `SOURCE_DATA_CHANGED` audit evidence with `SYSTEM_SOURCE_DRIFT`, timestamp and the authoritative revision at the stale transition, in the same transaction that advances source state and stales CURRENT decisions. Direct single-source mutation proof verifies the audit revision equals the new authoritative revision. A composite `save_comparable()` may contain several canonical low-level mutations; its immutable audit records retain the exact revision at which the decision first became stale while later source mutations may further advance the current revision.
 
-### E1PR002-IR-002 — concurrency-safe decision lifecycle
+### E1PR002-IR-005 — reproducible snapshot semantic SHA
 
-- selection, stale marking, validation and snapshot persistence use transaction/CAS protection;
-- blind overwrite of a newer human reselection is rejected;
-- run validation is rechecked before snapshot insert;
-- a decision set that becomes stale/reselected cannot persist a snapshot as though the older state were current.
+`normalized_base_evidence_ref` is persisted as immutable calculation-snapshot content. The canonical semantic payload can be reconstructed from persisted snapshot fields alone, and its SHA-256 reproduces the stored `semantic_sha256` both before and after current source state is advanced/rebound.
 
-### E1PR002-IR-003 — immutable decision lineage
+## 3. Previously closed behavior preserved
 
-- `case_id`, `comparable_property_id`, and `factor_key` are immutable after decision insert;
-- persistence rejects re-parenting/re-factoring of an existing decision identity;
-- historical audit rows remain bound to the same immutable decision lineage.
+Corrective-2 does not weaken IR-002 concurrency/CAS protection or IR-003 immutable decision lineage. Frozen C1–C11 ordering, Decimal-only arithmetic, explicit-zero semantics, human authority, P0/P1 dependency graph, CTXD boundary and Golden workbook provenance/output reproduction remain unchanged.
 
-## 3. Frozen behavior preserved
+## 4. Corrective-2 run history
 
-The corrective loop does not redesign the accepted E1-PR-002 calculation contract. It preserves:
+- `32030234190`: superseded/non-binding; 167 passed / 19 failed because the migration-result helper incorrectly indexed a dict row with `row[0]`.
+- `32030440283`: superseded/non-binding; 185 passed / 1 failed because the composite-save integration test incorrectly required the stale-transition audit revision to equal the final revision after multiple low-level mutations.
+- `32030676413`: **binding corrective-2 run**; 186/186 full and 36/36 focused PASS.
 
-- exact frozen C1–C11 order and canonical factor keys;
-- deterministic Decimal-only calculation;
-- explicit selected `0%` distinct from missing/unreviewed;
-- C1 on `P0`, C2 on `P1`, C3–C11 adjustment amounts on frozen `P1`;
-- human-selected rate authority;
-- supplied/precomputed construction aggregate as an Epic-1 boundary input only;
-- provenance-complete Golden decision fixture and exact workbook SHA/source cells;
-- direct-source reproduction of `F108 = 196308350`, `G108 = 227083250`, `H108 = 212201640`.
-
-## 4. Run history
-
-- `32009701673`: superseded; 175 passed / 2 failed due stale schema-v2 assertions.
-- `32009934815`: original pre-review binding run; 177/177 full and 27/27 focused PASS, later superseded by corrective implementation.
-- `32017373547`: non-binding corrective attempt; stopped at diff hygiene because prior Markdown hard-break trailing spaces were present.
-- `32017538546`: **binding corrective run**; 184/184 full and 34/34 focused PASS.
+Earlier pre-corrective runs remain superseded.
 
 ## 5. Claim boundary
 
-This evidence supports only E1-PR-002 / `AdjustmentCalculationGate`.
-
-It does not claim Comparable Quality / 15%, Human Indication, Final Valuation Composition, CTXD engine, workbook generation, Microsoft Excel qualification, or Epic 1 closure.
+This evidence supports only E1-PR-002 / `AdjustmentCalculationGate`. It does not claim Comparable Quality / 15%, Human Indication, Final Valuation Composition, CTXD engine, workbook generation, Microsoft Excel qualification, or Epic 1 closure.
 
 ## 6. Binding rule
 
-Any source, test, migration, fixture decision value, calculation contract, source-state contract, concurrency behavior, or persistence behavior change after corrective runtime-tested HEAD `74670edb9c5ece5cbd94706808272d6e08a2ee57` requires a new full Windows run before acceptance.
+Any source, test, migration, fixture decision value, calculation contract, source-state contract, audit behavior, snapshot semantics, concurrency behavior, or persistence behavior change after corrective-2 runtime-tested HEAD `0bfa7fef058541d93d5e546ea874325012cef140` requires a new full Windows run before acceptance.
 
-Evidence/report/handoff updates and removal of the one-time corrective workflow may form the post-test review delta only when they do not alter implementation-bearing behavior.
+Evidence/report/handoff updates and removal of the one-time corrective-2 verifier may form the post-test review delta only when they do not alter implementation-bearing behavior.
