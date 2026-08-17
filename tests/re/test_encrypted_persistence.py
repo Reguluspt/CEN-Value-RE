@@ -326,7 +326,7 @@ def test_legacy_cases_database_is_untouched(tmp_path: Path) -> None:
 
     persistence = _persistence(tmp_path, MemoryKeyProtector(), legacy)
     with persistence.open() as uow:
-        assert uow.schema_version == 1
+        assert uow.schema_version == LATEST_SCHEMA_VERSION
 
     after = hashlib.sha256(legacy.read_bytes()).hexdigest()
     assert before == after
