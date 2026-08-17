@@ -12,7 +12,7 @@ from uuid import uuid4
 
 from ...domain.adjustment import N08_FACTOR_KEYS, AdjustmentRunSnapshot, AdjustmentStep
 from ...domain.common.numeric import to_decimal
-from ...domain.common.rounding import RoundingPolicy, UNIT_PRICE_TARGET
+from ...domain.common.rounding import RoundingPolicy, RoundingSource, UNIT_PRICE_TARGET
 from ...domain.valuation import (
     ComparableQualityMetrics,
     ComparableReadinessResult,
@@ -117,6 +117,12 @@ def _decision_set_sha256(records: tuple[AdjustmentDecisionRecord, ...]) -> str:
         for item in records
     ]
     return _sha256_json(payload)
+
+
+def _rounding_selected_at_text(rounding_policy: RoundingPolicy) -> str | None:
+    if rounding_policy.selected_at is None:
+        return None
+    return rounding_policy.selected_at.isoformat()
 
 
 def _run_from_record(record: AdjustmentCalculationSnapshotRecord) -> AdjustmentRunSnapshot:
@@ -228,6 +234,22 @@ def _guidance_payload(guidance: GuidanceResult) -> dict[str, object]:
     }
 
 
+def _source_payload(
+    comparables: tuple[CurrentComparableEvidence, ...],
+) -> list[dict[str, str]]:
+    return [
+        {
+            "comparable_property_id": item.comparable_property_id,
+            "adjustment_snapshot_id": item.adjustment_snapshot_id,
+            "adjustment_semantic_sha256": item.adjustment_semantic_sha256,
+        }
+        for item in sorted(
+            comparables,
+            key=lambda current: current.comparable_property_id,
+        )
+    ]
+
+
 class ComparableQualityService:
     """Derive guidance from current adjustment evidence and persist human authority."""
 
@@ -277,9 +299,19 @@ class ComparableQualityService:
             raise ComparableQualityValidationError(
                 "human indicated-price selection requires UNIT_PRICE rounding target"
             )
+        if (rounding_policy.profile_id is None) != (
+            rounding_policy.profile_version is None
+        ):
+            raise ComparableQualityValidationError(
+                "rounding profile_id/profile_version must be supplied together"
+            )
 
         try:
             with self._uow.atomic():
+                case = self._uow.cases.get(case_id)
+                if case is None or case.archived_at is not None:
+                    raise ComparableQualityNotFoundError("Appraisal case was not found")
+                self._validate_rounding_policy_for_case(rounding_policy, case)
                 preview = self._build_current_preview(case_id)
                 quality_by_id = {
                     item.comparable_property_id: item.quality
@@ -317,17 +349,8 @@ class ComparableQualityService:
                 quality_payload = _quality_payload(metrics)
                 readiness_payload = _readiness_payload(preview.readiness)
                 guidance_payload = _guidance_payload(preview.guidance)
-                source_payload = [
-                    {
-                        "comparable_property_id": item.comparable_property_id,
-                        "adjustment_snapshot_id": item.adjustment_snapshot_id,
-                        "adjustment_semantic_sha256": item.adjustment_semantic_sha256,
-                    }
-                    for item in sorted(
-                        preview.comparables,
-                        key=lambda current: current.comparable_property_id,
-                    )
-                ]
+                source_payload = _source_payload(preview.comparables)
+                rounding_selected_at = _rounding_selected_at_text(rounding_policy)
                 semantic_payload = {
                     "case_id": case_id,
                     "selection_kind": selection_kind,
@@ -336,10 +359,13 @@ class ComparableQualityService:
                     "rounded_indicated_unit_price_vnd_per_m2": format(rounding.rounded_value, "f"),
                     "rounding": {
                         "target": rounding_policy.target.key,
+                        "mode": rounding_policy.mode.value,
                         "increment_vnd": rounding_policy.increment_vnd,
                         "source": rounding_policy.source.value,
                         "profile_id": rounding_policy.profile_id,
                         "profile_version": rounding_policy.profile_version,
+                        "selected_by": rounding_policy.selected_by,
+                        "selected_at": rounding_selected_at,
                     },
                     "confirmed_by": confirmed_by,
                     "confirmed_at": timestamp,
@@ -358,10 +384,13 @@ class ComparableQualityService:
                     raw_indicated_unit_price_vnd_per_m2=format(rounding.raw_value, "f"),
                     rounded_indicated_unit_price_vnd_per_m2=format(rounding.rounded_value, "f"),
                     rounding_target=rounding_policy.target.key,
+                    rounding_mode=rounding_policy.mode.value,
                     rounding_increment_vnd=rounding_policy.increment_vnd,
                     rounding_source=rounding_policy.source.value,
                     rounding_profile_id=rounding_policy.profile_id,
                     rounding_profile_version=rounding_policy.profile_version,
+                    rounding_selected_by=rounding_policy.selected_by,
+                    rounding_selected_at=rounding_selected_at,
                     confirmed_by=confirmed_by,
                     confirmed_at=timestamp,
                     reason=reason,
@@ -395,6 +424,157 @@ class ComparableQualityService:
                 "Human indication confirmation could not be persisted atomically"
             ) from exc
 
+    def resolve_current_indication(
+        self, *, case_id: str
+    ) -> HumanIndicationSnapshotRecord:
+        """Return the latest human confirmation only when its bound evidence is current."""
+
+        case_id = _require_text(case_id, "case_id")
+        try:
+            with self._uow.atomic():
+                preview = self._build_current_preview(case_id)
+                snapshots = self._uow.human_indication_snapshots.list_for_case(case_id)
+                if not snapshots:
+                    raise ComparableQualityNotFoundError(
+                        "No human indicated-price confirmation exists for this case"
+                    )
+                latest = snapshots[-1]
+                sources = self._uow.human_indication_sources.list_for_snapshot(latest.id)
+                if len(sources) != 3:
+                    raise ComparableQualityConflictError(
+                        "Human indication snapshot does not bind exactly three sources"
+                    )
+                current_ids = {
+                    item.comparable_property_id for item in preview.comparables
+                }
+                if {item.comparable_property_id for item in sources} != current_ids:
+                    raise ComparableQualityConflictError(
+                        "Human indication snapshot comparable lineage is no longer current"
+                    )
+                for source in sources:
+                    revision, decision_sha = self._current_decision_state(
+                        case_id, source.comparable_property_id
+                    )
+                    adjustment = self._uow.adjustment_calculation_snapshots.get(
+                        source.adjustment_snapshot_id
+                    )
+                    if (
+                        adjustment is None
+                        or adjustment.case_id != case_id
+                        or adjustment.comparable_property_id
+                        != source.comparable_property_id
+                        or adjustment.semantic_sha256
+                        != source.adjustment_semantic_sha256
+                        or adjustment.source_data_revision != revision
+                        or adjustment.decision_set_sha256 != decision_sha
+                    ):
+                        raise ComparableQualityConflictError(
+                            "Human indicated-price confirmation is stale; human reconfirmation is required"
+                        )
+                semantic_payload = {
+                    "case_id": latest.case_id,
+                    "selection_kind": latest.selection_kind,
+                    "selected_comparable_property_id": latest.selected_comparable_property_id,
+                    "raw_indicated_unit_price_vnd_per_m2": latest.raw_indicated_unit_price_vnd_per_m2,
+                    "rounded_indicated_unit_price_vnd_per_m2": latest.rounded_indicated_unit_price_vnd_per_m2,
+                    "rounding": {
+                        "target": latest.rounding_target,
+                        "mode": latest.rounding_mode,
+                        "increment_vnd": latest.rounding_increment_vnd,
+                        "source": latest.rounding_source,
+                        "profile_id": latest.rounding_profile_id,
+                        "profile_version": latest.rounding_profile_version,
+                        "selected_by": latest.rounding_selected_by,
+                        "selected_at": latest.rounding_selected_at,
+                    },
+                    "confirmed_by": latest.confirmed_by,
+                    "confirmed_at": latest.confirmed_at,
+                    "reason": latest.reason,
+                    "sources": [
+                        {
+                            "comparable_property_id": item.comparable_property_id,
+                            "adjustment_snapshot_id": item.adjustment_snapshot_id,
+                            "adjustment_semantic_sha256": item.adjustment_semantic_sha256,
+                        }
+                        for item in sorted(
+                            sources,
+                            key=lambda current: current.comparable_property_id,
+                        )
+                    ],
+                    "quality": json.loads(latest.quality_snapshot_json),
+                    "readiness": json.loads(latest.readiness_snapshot_json),
+                    "guidance": json.loads(latest.guidance_snapshot_json),
+                }
+                if _sha256_json(semantic_payload) != latest.semantic_sha256:
+                    raise ComparableQualityConflictError(
+                        "Human indication semantic evidence hash does not verify"
+                    )
+                return latest
+        except ComparableQualityError:
+            raise
+        except Exception as exc:
+            raise ComparableQualityPersistenceError(
+                "Current human indication could not be resolved consistently"
+            ) from exc
+
+    def _validate_rounding_policy_for_case(self, rounding_policy, case) -> None:
+        case_profile = (case.template_profile_id, case.template_profile_version)
+        policy_profile = (
+            rounding_policy.profile_id,
+            rounding_policy.profile_version,
+        )
+        if rounding_policy.source is RoundingSource.TEMPLATE_DEFAULT:
+            if case_profile[0] is None or case_profile[1] is None:
+                raise ComparableQualityConflictError(
+                    "Template-default rounding requires a case template profile binding"
+                )
+            if policy_profile != case_profile:
+                raise ComparableQualityConflictError(
+                    "Template-default rounding policy does not match the case profile"
+                )
+        elif rounding_policy.source is RoundingSource.APPLICATION_DEFAULT:
+            if case_profile[0] is not None or case_profile[1] is not None:
+                raise ComparableQualityConflictError(
+                    "Application-default rounding is not allowed when the case has a template profile"
+                )
+            if policy_profile != (None, None):
+                raise ComparableQualityValidationError(
+                    "Application-default rounding must not claim a template profile"
+                )
+        elif rounding_policy.source is RoundingSource.CASE_OVERRIDE:
+            if policy_profile != (None, None) and policy_profile != case_profile:
+                raise ComparableQualityConflictError(
+                    "Case rounding override profile metadata does not match the case"
+                )
+
+    def _current_decision_state(
+        self, case_id: str, comp_id: str
+    ) -> tuple[str, str]:
+        state = self._uow.adjustment_source_states.get(case_id, comp_id)
+        if state is None:
+            raise ComparableQualityConflictError(
+                f"{comp_id} has no authoritative adjustment source state"
+            )
+        authoritative_revision = str(state.source_revision)
+        decisions = self._uow.adjustment_decision_queries.list_for_comparable(
+            case_id, comp_id
+        )
+        if tuple(item.factor_key for item in decisions) != N08_FACTOR_KEYS:
+            raise ComparableQualityConflictError(
+                f"{comp_id} does not have complete C1-C11 decisions"
+            )
+        for item in decisions:
+            if (
+                item.review_status != "CURRENT"
+                or item.source_data_revision != authoritative_revision
+                or not item.selected_explicitly
+                or item.selected_rate_pct is None
+            ):
+                raise ComparableQualityConflictError(
+                    f"{comp_id} adjustment decisions are stale or incomplete"
+                )
+        return authoritative_revision, _decision_set_sha256(decisions)
+
     def _build_current_preview(self, case_id: str) -> ComparableQualityPreview:
         case = self._uow.cases.get(case_id)
         if case is None or case.archived_at is not None:
@@ -412,30 +592,9 @@ class ComparableQualityService:
         evidence: list[CurrentComparableEvidence] = []
         for comparable in comparables:
             comp_id = comparable.property_id
-            state = self._uow.adjustment_source_states.get(case_id, comp_id)
-            if state is None:
-                raise ComparableQualityConflictError(
-                    f"{comp_id} has no authoritative adjustment source state"
-                )
-            authoritative_revision = str(state.source_revision)
-            decisions = self._uow.adjustment_decision_queries.list_for_comparable(
+            authoritative_revision, current_sha = self._current_decision_state(
                 case_id, comp_id
             )
-            if tuple(item.factor_key for item in decisions) != N08_FACTOR_KEYS:
-                raise ComparableQualityConflictError(
-                    f"{comp_id} does not have complete C1-C11 decisions"
-                )
-            for item in decisions:
-                if (
-                    item.review_status != "CURRENT"
-                    or item.source_data_revision != authoritative_revision
-                    or not item.selected_explicitly
-                    or item.selected_rate_pct is None
-                ):
-                    raise ComparableQualityConflictError(
-                        f"{comp_id} adjustment decisions are stale or incomplete"
-                    )
-            current_sha = _decision_set_sha256(decisions)
             snapshots = self._uow.adjustment_calculation_snapshots.list_for_comparable(
                 case_id, comp_id
             )
