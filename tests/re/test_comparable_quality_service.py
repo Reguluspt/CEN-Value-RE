@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from src.re.adapters.excel import SUPPORTED_TEMPLATE_ROUNDING_DEFAULTS
 from src.re.adapters.persistence.migrations import LATEST_SCHEMA_VERSION, apply_migrations
 from src.re.adapters.persistence.store import SQLCipherUnitOfWork
 from src.re.application.services.comparable_quality import (
@@ -37,6 +38,14 @@ def _connection():
     connection.row_factory = _dict_factory
     connection.execute("PRAGMA foreign_keys=ON")
     return connection
+
+
+def _quality_service(uow, **kwargs):
+    return ComparableQualityService(
+        uow,
+        template_rounding_defaults=SUPPORTED_TEMPLATE_ROUNDING_DEFAULTS,
+        **kwargs,
+    )
 
 
 def _seed_three_comparables(connection):
@@ -192,7 +201,7 @@ def test_golden_preview_and_human_confirmation_match_g18_h119():
         _seed_three_comparables(connection)
         uow = SQLCipherUnitOfWork(connection, schema_version)
         _, source_runs = _build_golden_adjustment_evidence(uow)
-        service = ComparableQualityService(
+        service = _quality_service(
             uow,
             now=lambda: "2026-08-17T13:30:00Z",
             new_id=lambda: "human-1",
@@ -275,7 +284,7 @@ def test_case_override_rounding_metadata_is_audited_in_confirmation_snapshot():
             selected_by="rounding-appraiser",
             selected_at=selected_at,
         )
-        service = ComparableQualityService(
+        service = _quality_service(
             uow,
             now=lambda: "2026-08-17T13:36:00Z",
             new_id=lambda: "human-case-rounding",
@@ -301,7 +310,36 @@ def test_case_override_rounding_metadata_is_audited_in_confirmation_snapshot():
         connection.close()
 
 
-def test_template_default_rounding_must_match_case_profile():
+@pytest.mark.parametrize("bad_increment", [None, 10000])
+def test_n08_template_default_rejects_increment_not_declared_by_profile(bad_increment):
+    connection = _connection()
+    try:
+        schema_version = apply_migrations(connection)
+        _seed_three_comparables(connection)
+        uow = SQLCipherUnitOfWork(connection, schema_version)
+        _build_golden_adjustment_evidence(uow)
+        service = _quality_service(uow)
+        invalid_default = RoundingPolicy(
+            target=UNIT_PRICE_TARGET,
+            increment_vnd=bad_increment,
+            source=RoundingSource.TEMPLATE_DEFAULT,
+            profile_id="cenvalue-re-n08-0038-v1",
+            profile_version="1",
+        )
+        with pytest.raises(ComparableQualityConflictError, match="trusted profile default"):
+            service.confirm_indication(
+                case_id="case-1",
+                selection_kind="COMPARABLE",
+                selected_comparable_property_id="comp-1",
+                confirmed_by="appraiser",
+                reason="attempted false template default",
+                rounding_policy=invalid_default,
+            )
+    finally:
+        connection.close()
+
+
+def test_template_default_rounding_requires_trusted_profile_resolver():
     connection = _connection()
     try:
         schema_version = apply_migrations(connection)
@@ -309,6 +347,27 @@ def test_template_default_rounding_must_match_case_profile():
         uow = SQLCipherUnitOfWork(connection, schema_version)
         _build_golden_adjustment_evidence(uow)
         service = ComparableQualityService(uow)
+        with pytest.raises(ComparableQualityConflictError, match="trusted template-profile resolver"):
+            service.confirm_indication(
+                case_id="case-1",
+                selection_kind="COMPARABLE",
+                selected_comparable_property_id="comp-1",
+                confirmed_by="appraiser",
+                reason="resolver intentionally missing",
+                rounding_policy=_rounding_policy(),
+            )
+    finally:
+        connection.close()
+
+
+def test_template_default_rounding_must_match_case_profile():
+    connection = _connection()
+    try:
+        schema_version = apply_migrations(connection)
+        _seed_three_comparables(connection)
+        uow = SQLCipherUnitOfWork(connection, schema_version)
+        _build_golden_adjustment_evidence(uow)
+        service = _quality_service(uow)
         wrong_profile = RoundingPolicy(
             target=UNIT_PRICE_TARGET,
             increment_vnd=1000,
@@ -336,7 +395,7 @@ def test_human_can_choose_nonrecommended_current_comparable_but_not_arbitrary_pr
         _seed_three_comparables(connection)
         uow = SQLCipherUnitOfWork(connection, schema_version)
         _build_golden_adjustment_evidence(uow)
-        service = ComparableQualityService(
+        service = _quality_service(
             uow,
             now=lambda: "2026-08-17T13:31:00Z",
             new_id=lambda: "human-2",
@@ -372,7 +431,7 @@ def test_reselection_after_snapshot_blocks_quality_until_adjustment_is_rerun():
         _seed_three_comparables(connection)
         uow = SQLCipherUnitOfWork(connection, schema_version)
         market, _ = _build_golden_adjustment_evidence(uow)
-        service = ComparableQualityService(uow)
+        service = _quality_service(uow)
         assert service.preview(case_id="case-1").guidance.kind == "COMPARABLE"
 
         market.select_rate(
@@ -398,7 +457,7 @@ def test_human_confirmation_requires_actor_reason_and_current_supported_average(
         _seed_three_comparables(connection)
         uow = SQLCipherUnitOfWork(connection, schema_version)
         _build_golden_adjustment_evidence(uow)
-        service = ComparableQualityService(uow)
+        service = _quality_service(uow)
 
         with pytest.raises(ComparableQualityValidationError, match="confirmed_by"):
             service.confirm_indication(
@@ -438,7 +497,7 @@ def test_persisted_human_indication_and_source_rows_are_immutable():
         _seed_three_comparables(connection)
         uow = SQLCipherUnitOfWork(connection, schema_version)
         _build_golden_adjustment_evidence(uow)
-        service = ComparableQualityService(
+        service = _quality_service(
             uow,
             now=lambda: "2026-08-17T13:40:00Z",
             new_id=lambda: "human-immutable",
