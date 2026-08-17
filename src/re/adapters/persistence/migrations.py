@@ -263,6 +263,7 @@ MIGRATIONS = (
                 comparable_property_id TEXT NOT NULL REFERENCES comparable_property(property_id),
                 source_data_revision TEXT NOT NULL,
                 normalized_base_price_vnd_per_m2 TEXT NOT NULL,
+                normalized_base_evidence_ref TEXT NOT NULL,
                 property_adjustment_base_vnd_per_m2 TEXT NOT NULL,
                 indicated_unit_price_vnd_per_m2 TEXT NOT NULL,
                 decision_set_sha256 TEXT NOT NULL,
@@ -323,6 +324,15 @@ MIGRATIONS = (
                   normalized_base_evidence_ref=NULL,
                   updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
               WHERE comparable_property_id=NEW.id;
+              INSERT INTO adjustment_selection_audit(
+                  id,adjustment_decision_id,case_id,comparable_property_id,factor_key,event_kind,
+                  selected_rate_pct,selected_explicitly,selected_by,selected_at,source_data_revision,review_status)
+              SELECT lower(hex(randomblob(16))),id,case_id,comparable_property_id,factor_key,
+                  'SOURCE_DATA_CHANGED',selected_rate_pct,selected_explicitly,'SYSTEM_SOURCE_DRIFT',
+                  strftime('%Y-%m-%dT%H:%M:%fZ','now'),
+                  CAST((SELECT source_revision FROM adjustment_source_state WHERE comparable_property_id=NEW.id) AS TEXT),
+                  'SOURCE_DATA_CHANGED'
+              FROM adjustment_decision WHERE comparable_property_id=NEW.id AND review_status='CURRENT';
               UPDATE adjustment_decision
               SET review_status='SOURCE_DATA_CHANGED',version=version+1
               WHERE comparable_property_id=NEW.id AND review_status='CURRENT';
@@ -337,6 +347,15 @@ MIGRATIONS = (
                   normalized_base_evidence_ref=NULL,
                   updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
               WHERE comparable_property_id=NEW.comparable_property_id;
+              INSERT INTO adjustment_selection_audit(
+                  id,adjustment_decision_id,case_id,comparable_property_id,factor_key,event_kind,
+                  selected_rate_pct,selected_explicitly,selected_by,selected_at,source_data_revision,review_status)
+              SELECT lower(hex(randomblob(16))),id,case_id,comparable_property_id,factor_key,
+                  'SOURCE_DATA_CHANGED',selected_rate_pct,selected_explicitly,'SYSTEM_SOURCE_DRIFT',
+                  strftime('%Y-%m-%dT%H:%M:%fZ','now'),
+                  CAST((SELECT source_revision FROM adjustment_source_state WHERE comparable_property_id=NEW.comparable_property_id) AS TEXT),
+                  'SOURCE_DATA_CHANGED'
+              FROM adjustment_decision WHERE comparable_property_id=NEW.comparable_property_id AND review_status='CURRENT';
               UPDATE adjustment_decision
               SET review_status='SOURCE_DATA_CHANGED',version=version+1
               WHERE comparable_property_id=NEW.comparable_property_id AND review_status='CURRENT';
@@ -351,6 +370,15 @@ MIGRATIONS = (
                   normalized_base_evidence_ref=NULL,
                   updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
               WHERE comparable_property_id=NEW.comparable_property_id;
+              INSERT INTO adjustment_selection_audit(
+                  id,adjustment_decision_id,case_id,comparable_property_id,factor_key,event_kind,
+                  selected_rate_pct,selected_explicitly,selected_by,selected_at,source_data_revision,review_status)
+              SELECT lower(hex(randomblob(16))),id,case_id,comparable_property_id,factor_key,
+                  'SOURCE_DATA_CHANGED',selected_rate_pct,selected_explicitly,'SYSTEM_SOURCE_DRIFT',
+                  strftime('%Y-%m-%dT%H:%M:%fZ','now'),
+                  CAST((SELECT source_revision FROM adjustment_source_state WHERE comparable_property_id=NEW.comparable_property_id) AS TEXT),
+                  'SOURCE_DATA_CHANGED'
+              FROM adjustment_decision WHERE comparable_property_id=NEW.comparable_property_id AND review_status='CURRENT';
               UPDATE adjustment_decision
               SET review_status='SOURCE_DATA_CHANGED',version=version+1
               WHERE comparable_property_id=NEW.comparable_property_id AND review_status='CURRENT';
@@ -366,6 +394,15 @@ MIGRATIONS = (
                   normalized_base_evidence_ref=NULL,
                   updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
               WHERE comparable_property_id=NEW.property_id;
+              INSERT INTO adjustment_selection_audit(
+                  id,adjustment_decision_id,case_id,comparable_property_id,factor_key,event_kind,
+                  selected_rate_pct,selected_explicitly,selected_by,selected_at,source_data_revision,review_status)
+              SELECT lower(hex(randomblob(16))),id,case_id,comparable_property_id,factor_key,
+                  'SOURCE_DATA_CHANGED',selected_rate_pct,selected_explicitly,'SYSTEM_SOURCE_DRIFT',
+                  strftime('%Y-%m-%dT%H:%M:%fZ','now'),
+                  CAST((SELECT source_revision FROM adjustment_source_state WHERE comparable_property_id=NEW.property_id) AS TEXT),
+                  'SOURCE_DATA_CHANGED'
+              FROM adjustment_decision WHERE comparable_property_id=NEW.property_id AND review_status='CURRENT';
               UPDATE adjustment_decision
               SET review_status='SOURCE_DATA_CHANGED',version=version+1
               WHERE comparable_property_id=NEW.property_id AND review_status='CURRENT';
@@ -381,6 +418,15 @@ MIGRATIONS = (
                   normalized_base_evidence_ref=NULL,
                   updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
               WHERE comparable_property_id=NEW.property_id;
+              INSERT INTO adjustment_selection_audit(
+                  id,adjustment_decision_id,case_id,comparable_property_id,factor_key,event_kind,
+                  selected_rate_pct,selected_explicitly,selected_by,selected_at,source_data_revision,review_status)
+              SELECT lower(hex(randomblob(16))),id,case_id,comparable_property_id,factor_key,
+                  'SOURCE_DATA_CHANGED',selected_rate_pct,selected_explicitly,'SYSTEM_SOURCE_DRIFT',
+                  strftime('%Y-%m-%dT%H:%M:%fZ','now'),
+                  CAST((SELECT source_revision FROM adjustment_source_state WHERE comparable_property_id=NEW.property_id) AS TEXT),
+                  'SOURCE_DATA_CHANGED'
+              FROM adjustment_decision WHERE comparable_property_id=NEW.property_id AND review_status='CURRENT';
               UPDATE adjustment_decision
               SET review_status='SOURCE_DATA_CHANGED',version=version+1
               WHERE comparable_property_id=NEW.property_id AND review_status='CURRENT';
@@ -433,5 +479,6 @@ def apply_migrations(connection) -> int:
         except Exception:
             connection.rollback()
             raise
-    row = connection.execute("SELECT COALESCE(MAX(version), 0) AS version FROM re_schema_migration").fetchone()
-    return _scalar(row)
+
+    row = connection.execute("SELECT MAX(version) FROM re_schema_migration").fetchone()
+    return _scalar(row) if row and row[0] is not None else 0
