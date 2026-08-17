@@ -226,6 +226,14 @@ MIGRATIONS = (
             BEGIN
               SELECT RAISE(ABORT, 'adjustment decision case lineage mismatch');
             END""",
+            """CREATE TRIGGER adjustment_decision_identity_update_guard
+            BEFORE UPDATE OF case_id, comparable_property_id, factor_key ON adjustment_decision
+            WHEN NEW.case_id != OLD.case_id
+              OR NEW.comparable_property_id != OLD.comparable_property_id
+              OR NEW.factor_key != OLD.factor_key
+            BEGIN
+              SELECT RAISE(ABORT, 'adjustment decision identity is immutable');
+            END""",
             """CREATE TABLE adjustment_selection_audit (
                 id TEXT PRIMARY KEY,
                 adjustment_decision_id TEXT NOT NULL REFERENCES adjustment_decision(id),
@@ -267,6 +275,115 @@ MIGRATIONS = (
             WHEN NEW.case_id != (SELECT case_id FROM comparable_property WHERE property_id=NEW.comparable_property_id)
             BEGIN
               SELECT RAISE(ABORT, 'adjustment calculation snapshot case lineage mismatch');
+            END""",
+            """CREATE TABLE adjustment_source_state (
+                case_id TEXT NOT NULL REFERENCES appraisal_case(id),
+                comparable_property_id TEXT PRIMARY KEY REFERENCES comparable_property(property_id),
+                source_revision INTEGER NOT NULL CHECK (source_revision > 0),
+                normalized_base_price_vnd_per_m2 TEXT,
+                normalized_base_bound_revision INTEGER,
+                normalized_base_evidence_ref TEXT,
+                updated_at TEXT NOT NULL,
+                CHECK (
+                    (normalized_base_price_vnd_per_m2 IS NULL AND normalized_base_bound_revision IS NULL AND normalized_base_evidence_ref IS NULL)
+                    OR
+                    (normalized_base_price_vnd_per_m2 IS NOT NULL AND normalized_base_bound_revision = source_revision AND length(trim(normalized_base_evidence_ref)) > 0)
+                )
+            )""",
+            """CREATE TRIGGER adjustment_source_state_lineage_insert_guard
+            BEFORE INSERT ON adjustment_source_state
+            WHEN NEW.case_id != (SELECT case_id FROM comparable_property WHERE property_id=NEW.comparable_property_id)
+            BEGIN
+              SELECT RAISE(ABORT, 'adjustment source state lineage mismatch');
+            END""",
+            """CREATE TRIGGER adjustment_source_state_identity_update_guard
+            BEFORE UPDATE OF case_id, comparable_property_id ON adjustment_source_state
+            WHEN NEW.case_id != OLD.case_id OR NEW.comparable_property_id != OLD.comparable_property_id
+            BEGIN
+              SELECT RAISE(ABORT, 'adjustment source state identity is immutable');
+            END""",
+            """INSERT INTO adjustment_source_state(case_id,comparable_property_id,source_revision,updated_at)
+            SELECT case_id,property_id,1,strftime('%Y-%m-%dT%H:%M:%fZ','now')
+            FROM comparable_property WHERE case_id IS NOT NULL""",
+            """CREATE TRIGGER adjustment_source_comparable_insert
+            AFTER INSERT ON comparable_property
+            WHEN NEW.case_id IS NOT NULL
+            BEGIN
+              INSERT OR IGNORE INTO adjustment_source_state(case_id,comparable_property_id,source_revision,updated_at)
+              VALUES (NEW.case_id,NEW.property_id,1,strftime('%Y-%m-%dT%H:%M:%fZ','now'));
+            END""",
+            """CREATE TRIGGER adjustment_source_property_update
+            AFTER UPDATE OF legal_address,current_address,latitude,longitude,planning_note,environment_note,version,archived_at ON property
+            WHEN NEW.role='COMPARABLE'
+            BEGIN
+              UPDATE adjustment_source_state
+              SET source_revision=source_revision+1,
+                  normalized_base_price_vnd_per_m2=NULL,
+                  normalized_base_bound_revision=NULL,
+                  normalized_base_evidence_ref=NULL,
+                  updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
+              WHERE comparable_property_id=NEW.id;
+              UPDATE adjustment_decision
+              SET review_status='SOURCE_DATA_CHANGED',version=version+1
+              WHERE comparable_property_id=NEW.id AND review_status='CURRENT';
+            END""",
+            """CREATE TRIGGER adjustment_source_market_insert
+            AFTER INSERT ON market_observation
+            BEGIN
+              UPDATE adjustment_source_state
+              SET source_revision=source_revision+1,
+                  normalized_base_price_vnd_per_m2=NULL,
+                  normalized_base_bound_revision=NULL,
+                  normalized_base_evidence_ref=NULL,
+                  updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
+              WHERE comparable_property_id=NEW.comparable_property_id;
+              UPDATE adjustment_decision
+              SET review_status='SOURCE_DATA_CHANGED',version=version+1
+              WHERE comparable_property_id=NEW.comparable_property_id AND review_status='CURRENT';
+            END""",
+            """CREATE TRIGGER adjustment_source_market_update
+            AFTER UPDATE ON market_observation
+            BEGIN
+              UPDATE adjustment_source_state
+              SET source_revision=source_revision+1,
+                  normalized_base_price_vnd_per_m2=NULL,
+                  normalized_base_bound_revision=NULL,
+                  normalized_base_evidence_ref=NULL,
+                  updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
+              WHERE comparable_property_id=NEW.comparable_property_id;
+              UPDATE adjustment_decision
+              SET review_status='SOURCE_DATA_CHANGED',version=version+1
+              WHERE comparable_property_id=NEW.comparable_property_id AND review_status='CURRENT';
+            END""",
+            """CREATE TRIGGER adjustment_source_characteristic_insert
+            AFTER INSERT ON property_characteristic
+            WHEN EXISTS(SELECT 1 FROM property WHERE id=NEW.property_id AND role='COMPARABLE')
+            BEGIN
+              UPDATE adjustment_source_state
+              SET source_revision=source_revision+1,
+                  normalized_base_price_vnd_per_m2=NULL,
+                  normalized_base_bound_revision=NULL,
+                  normalized_base_evidence_ref=NULL,
+                  updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
+              WHERE comparable_property_id=NEW.property_id;
+              UPDATE adjustment_decision
+              SET review_status='SOURCE_DATA_CHANGED',version=version+1
+              WHERE comparable_property_id=NEW.property_id AND review_status='CURRENT';
+            END""",
+            """CREATE TRIGGER adjustment_source_characteristic_update
+            AFTER UPDATE ON property_characteristic
+            WHEN EXISTS(SELECT 1 FROM property WHERE id=NEW.property_id AND role='COMPARABLE')
+            BEGIN
+              UPDATE adjustment_source_state
+              SET source_revision=source_revision+1,
+                  normalized_base_price_vnd_per_m2=NULL,
+                  normalized_base_bound_revision=NULL,
+                  normalized_base_evidence_ref=NULL,
+                  updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
+              WHERE comparable_property_id=NEW.property_id;
+              UPDATE adjustment_decision
+              SET review_status='SOURCE_DATA_CHANGED',version=version+1
+              WHERE comparable_property_id=NEW.property_id AND review_status='CURRENT';
             END""",
             "CREATE INDEX ix_adjustment_audit_decision ON adjustment_selection_audit(adjustment_decision_id, selected_at, id)",
             "CREATE INDEX ix_adjustment_snapshot_comparable ON adjustment_calculation_snapshot(case_id, comparable_property_id, created_at, id)",
