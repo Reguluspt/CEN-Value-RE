@@ -2,9 +2,14 @@ import hashlib
 import json
 import sqlite3
 
+import pytest
+
 from src.re.adapters.persistence.migrations import apply_migrations
 from src.re.adapters.persistence.store import SQLCipherUnitOfWork
-from src.re.application.services.comparable_quality import ComparableQualityService
+from src.re.application.services.comparable_quality import (
+    ComparableQualityConflictError,
+    ComparableQualityService,
+)
 from src.re.application.services.market_adjustment import MarketAdjustmentService
 from src.re.domain.common.rounding import (
     RoundingPolicy,
@@ -26,8 +31,11 @@ def _connection():
 
 def _seed_case(connection):
     connection.execute(
-        """INSERT INTO appraisal_case(id,case_code,status,created_at,updated_at)
-        VALUES ('case-1','CV-E1-003-A','IN_PROGRESS','t','t')"""
+        """INSERT INTO appraisal_case(
+            id,case_code,status,created_at,updated_at,
+            template_profile_id,template_profile_version
+        ) VALUES ('case-1','CV-E1-003-A','IN_PROGRESS','t','t',
+            'cenvalue-re-n08-0038-v1','1')"""
     )
     for index in range(1, 4):
         comp_id = f"comp-{index}"
@@ -76,10 +84,13 @@ def _semantic_sha(snapshot, sources):
         "rounded_indicated_unit_price_vnd_per_m2": snapshot.rounded_indicated_unit_price_vnd_per_m2,
         "rounding": {
             "target": snapshot.rounding_target,
+            "mode": snapshot.rounding_mode,
             "increment_vnd": snapshot.rounding_increment_vnd,
             "source": snapshot.rounding_source,
             "profile_id": snapshot.rounding_profile_id,
             "profile_version": snapshot.rounding_profile_version,
+            "selected_by": snapshot.rounding_selected_by,
+            "selected_at": snapshot.rounding_selected_at,
         },
         "confirmed_by": snapshot.confirmed_by,
         "confirmed_at": snapshot.confirmed_at,
@@ -154,11 +165,12 @@ def test_zero_gross_tie_average_is_supported_only_after_current_adjustment_runs(
         assert persisted is not None
         assert persisted.selection_kind == "ZERO_GROSS_AVERAGE"
         assert persisted.selected_comparable_property_id is None
+        assert service.resolve_current_indication(case_id="case-1") == persisted
     finally:
         connection.close()
 
 
-def test_confirmed_human_snapshot_sha_remains_reconstructable_after_source_drift():
+def test_confirmed_human_snapshot_stays_reproducible_but_is_not_current_after_source_drift():
     connection = _connection()
     try:
         schema_version = apply_migrations(connection)
@@ -167,7 +179,7 @@ def test_confirmed_human_snapshot_sha_remains_reconstructable_after_source_drift
         market = MarketAdjustmentService(
             uow,
             now=lambda: "2026-08-17T14:10:00Z",
-            new_id=iter((f"adj-x-{index}" for index in range(1, 200))).__next__,
+            new_id=iter((f"adj-x-{index}" for index in range(1, 300))).__next__,
         )
         for comp_id, p0 in (
             ("comp-1", "100000"),
@@ -203,6 +215,7 @@ def test_confirmed_human_snapshot_sha_remains_reconstructable_after_source_drift
         assert before is not None
         assert len(before_sources) == 3
         assert _semantic_sha(before, before_sources) == before.semantic_sha256
+        assert service.resolve_current_indication(case_id="case-1") == before
 
         market.bind_normalized_base(
             case_id="case-1",
@@ -218,5 +231,10 @@ def test_confirmed_human_snapshot_sha_remains_reconstructable_after_source_drift
         assert after == before
         assert after_sources == before_sources
         assert _semantic_sha(after, after_sources) == after.semantic_sha256
+
+        _select_all(market, "comp-1")
+        market.run_adjustment(case_id="case-1", comparable_property_id="comp-1")
+        with pytest.raises(ComparableQualityConflictError, match="reconfirmation"):
+            service.resolve_current_indication(case_id="case-1")
     finally:
         connection.close()
