@@ -1,4 +1,7 @@
+import hashlib
+import json
 from decimal import Decimal, localcontext
+from pathlib import Path
 
 import pytest
 
@@ -13,10 +16,21 @@ from src.re.domain.adjustment import (
 )
 
 
+_FIXTURE_PATH = (
+    Path(__file__).resolve().parents[2]
+    / "fixtures"
+    / "GOLDEN_CASE_ADJUSTMENT_DECISIONS_v1.json"
+)
+
+
 def _decisions(*, c1="0", c2="0", c3="0"):
     rates = {key: "0" for key in N08_FACTOR_KEYS}
     rates.update({"C1": c1, "C2": c2, "C3": c3})
     return tuple(SelectedAdjustmentDecision(key, rates[key]) for key in N08_FACTOR_KEYS)
+
+
+def _load_golden_decision_fixture():
+    return json.loads(_FIXTURE_PATH.read_text(encoding="utf-8"))
 
 
 def test_n08_registry_preserves_frozen_order_and_canonical_keys():
@@ -161,6 +175,68 @@ def test_calculation_is_deterministic_under_low_ambient_decimal_precision():
             decisions=_decisions(c1="-0.05", c2="0.10", c3="-0.03"),
         )
     assert actual == expected
+
+
+def test_golden_decision_fixture_digest_and_source_provenance_are_frozen():
+    fixture = _load_golden_decision_fixture()
+    assert fixture["fixture_id"] == "N08-0038-adjustment-decisions-v1"
+    assert fixture["source"]["workbook_sha256"] == (
+        "d410cfcc2263d7d50a436a79e192461f04b6863e6c3676a28da7a2eed287389c"
+    )
+    assert fixture["source"]["extraction_kind"] == "DIRECT_STORED_CELL_VALUE"
+    assert fixture["source"]["actor_metadata_status"] == "NOT_AVAILABLE_IN_SOURCE_WORKBOOK"
+
+    semantic_payload = {
+        key: value
+        for key, value in fixture.items()
+        if key not in {"semantic_sha256", "semantic_digest_rule"}
+    }
+    encoded = json.dumps(
+        semantic_payload,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    assert hashlib.sha256(encoded).hexdigest() == fixture["semantic_sha256"]
+
+    cells = [
+        decision["source_cell"]
+        for comparable in fixture["comparables"]
+        for decision in comparable["decisions"]
+    ]
+    assert len(cells) == 33
+    assert len(set(cells)) == 33
+    assert all(decision["selected_explicitly"] for comparable in fixture["comparables"] for decision in comparable["decisions"])
+
+
+def test_direct_source_golden_decisions_reproduce_f108_g108_h108():
+    fixture = _load_golden_decision_fixture()
+    p0_by_comparable = {
+        "TSSS01": "230951000",
+        "TSSS02": "239035000",
+        "TSSS03": "196483000",
+    }
+    expected_by_comparable = {
+        "TSSS01": Decimal("196308350"),
+        "TSSS02": Decimal("227083250"),
+        "TSSS03": Decimal("212201640"),
+    }
+    for comparable in fixture["comparables"]:
+        decisions = tuple(
+            SelectedAdjustmentDecision(
+                decision["factor_key"],
+                decision["selected_rate_fraction"],
+                selected_explicitly=decision["selected_explicitly"],
+            )
+            for decision in comparable["decisions"]
+        )
+        snapshot = calculate_adjustment_run(
+            normalized_base_price_vnd_per_m2=p0_by_comparable[comparable["comparable_id"]],
+            decisions=decisions,
+        )
+        assert snapshot.indicated_unit_price_vnd_per_m2 == expected_by_comparable[
+            comparable["comparable_id"]
+        ]
 
 
 @pytest.mark.parametrize(
