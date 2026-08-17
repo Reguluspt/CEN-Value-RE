@@ -29,6 +29,10 @@ from .repositories import (
 )
 from .strict_adjustment_decision_repository import StrictSQLCipherAdjustmentDecisionRepository
 from .sqlcipher import cipher_version, open_encrypted_connection
+from .valuation_repositories import (
+    SQLCipherHumanIndicationSnapshotRepository,
+    SQLCipherHumanIndicationSourceRepository,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -62,6 +66,8 @@ class SQLCipherUnitOfWork:
         self.adjustment_selection_audit = SQLCipherAdjustmentSelectionAuditRepository(connection)
         self.adjustment_calculation_snapshots = SQLCipherAdjustmentCalculationSnapshotRepository(connection)
         self.adjustment_source_states = SQLCipherAdjustmentSourceStateRepository(connection)
+        self.human_indication_snapshots = SQLCipherHumanIndicationSnapshotRepository(connection)
+        self.human_indication_sources = SQLCipherHumanIndicationSourceRepository(connection)
         self.approval_submissions = SQLCipherApprovalSubmissionRepository(connection)
 
     @property

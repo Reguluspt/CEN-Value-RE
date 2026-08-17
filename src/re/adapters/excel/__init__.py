@@ -26,6 +26,11 @@ from .profile import (
     FormulaSignature,
     SheetRequirement,
     SheetState,
+    TemplateRoundingDefault,
+)
+from .rounding_defaults import (
+    ExcelTemplateRoundingDefaultResolver,
+    SUPPORTED_TEMPLATE_ROUNDING_DEFAULTS,
 )
 
 __all__ = [
@@ -33,6 +38,7 @@ __all__ = [
     "CellRule",
     "CompatibilityTransformation",
     "ExcelTemplateProfile",
+    "ExcelTemplateRoundingDefaultResolver",
     "ExternalLinkPolicy",
     "ExternalLinkState",
     "FingerprintIssue",
@@ -43,9 +49,11 @@ __all__ = [
     "FormulaObservation",
     "FormulaSignature",
     "N08_0038_PROFILE",
+    "SUPPORTED_TEMPLATE_ROUNDING_DEFAULTS",
     "SheetObservation",
     "SheetRequirement",
     "SheetState",
+    "TemplateRoundingDefault",
     "UnsupportedTemplateError",
     "WorkbookFingerprintObservation",
     "formula_signature_digest",
