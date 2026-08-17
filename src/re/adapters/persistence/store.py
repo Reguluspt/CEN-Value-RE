@@ -7,6 +7,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterator
 
+from .adjustment_repositories import (
+    SQLCipherAdjustmentCalculationSnapshotRepository,
+    SQLCipherAdjustmentDecisionQueryRepository,
+    SQLCipherAdjustmentSelectionAuditRepository,
+)
 from .key_protection import KeyProtector, load_or_create_master_key
 from .migrations import apply_migrations
 from .repositories import (
@@ -52,6 +57,9 @@ class SQLCipherUnitOfWork:
         self.evidence = SQLCipherEvidenceRepository(connection)
         self.construction_assets = SQLCipherConstructionAssetRepository(connection)
         self.adjustment_decisions = SQLCipherAdjustmentDecisionRepository(connection)
+        self.adjustment_decision_queries = SQLCipherAdjustmentDecisionQueryRepository(connection)
+        self.adjustment_selection_audit = SQLCipherAdjustmentSelectionAuditRepository(connection)
+        self.adjustment_calculation_snapshots = SQLCipherAdjustmentCalculationSnapshotRepository(connection)
         self.approval_submissions = SQLCipherApprovalSubmissionRepository(connection)
 
     @property
