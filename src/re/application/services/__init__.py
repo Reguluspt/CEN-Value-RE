@@ -1,5 +1,16 @@
 """Application services package."""
 
+from .comparable_quality import (
+    ComparableQualityConflictError,
+    ComparableQualityError,
+    ComparableQualityNotFoundError,
+    ComparableQualityPersistenceError,
+    ComparableQualityPreview,
+    ComparableQualityService,
+    ComparableQualityValidationError,
+    CurrentComparableEvidence,
+    PersistedHumanIndication,
+)
 from .golden_fixture import (
     CheckpointManifest,
     CheckpointOutcome,
@@ -43,6 +54,14 @@ __all__ = [
     "CheckpointSpec",
     "ComparisonKind",
     "ComparisonPolicy",
+    "ComparableQualityConflictError",
+    "ComparableQualityError",
+    "ComparableQualityNotFoundError",
+    "ComparableQualityPersistenceError",
+    "ComparableQualityPreview",
+    "ComparableQualityService",
+    "ComparableQualityValidationError",
+    "CurrentComparableEvidence",
     "GoldenFixtureBundle",
     "GoldenFixtureFormatError",
     "GoldenFixtureSnapshot",
@@ -59,6 +78,7 @@ __all__ = [
     "MarketAdjustmentService",
     "MarketAdjustmentValidationError",
     "PersistedAdjustmentRun",
+    "PersistedHumanIndication",
     "UnsupportedProfileError",
     "compare_checkpoint",
     "evaluate_checkpoint_results",
