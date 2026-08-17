@@ -323,7 +323,10 @@ class ComparableQualityService:
                         "adjustment_snapshot_id": item.adjustment_snapshot_id,
                         "adjustment_semantic_sha256": item.adjustment_semantic_sha256,
                     }
-                    for item in preview.comparables
+                    for item in sorted(
+                        preview.comparables,
+                        key=lambda current: current.comparable_property_id,
+                    )
                 ]
                 semantic_payload = {
                     "case_id": case_id,
