@@ -3,20 +3,21 @@
 **Date:** 2026-08-17
 **Repository:** `Reguluspt/CEN-Value-RE`
 **Accepted base:** `c4e5753c328443e63ce474c03ecbbbf31a2370ed`
-**Runtime-tested HEAD:** `83f742baf42b9f56c887b80c38b15972f22650a4`
-**Binding GitHub Actions run:** `32009934815`
-**Runner:** `windows-latest` / Microsoft Windows Server 2025
+**Original review HEAD:** `e197ab72a65fe3c2308cad2d866eba704b7e3424`
+**Corrective runtime-tested HEAD:** `74670edb9c5ece5cbd94706808272d6e08a2ee57`
+**Binding corrective GitHub Actions run:** `32017538546`
+**Runner:** Microsoft Windows Server 2025
 **Python:** `3.11.9`
 
-## 1. Result
+## 1. Binding result
 
-Binding run `32009934815` completed SUCCESS on exact implementation HEAD `83f742baf42b9f56c887b80c38b15972f22650a4`.
+Run `32017538546` completed SUCCESS against corrective implementation HEAD `74670edb9c5ece5cbd94706808272d6e08a2ee57`.
 
 - dependency install: PASS;
 - `git diff --check c4e5753...HEAD`: PASS;
 - `python -m compileall -q src/re`: PASS;
-- full accepted `tests/re`: **177 passed in 3.21s**;
-- focused E1-PR-002 suite: **27 passed in 0.13s**.
+- full `tests/re`: **184 passed in 3.35s**;
+- focused E1-PR-002 corrective suite: **34 passed in 0.18s**.
 
 Runtime dependency set:
 
@@ -25,90 +26,59 @@ Runtime dependency set:
 - pywin32 `312`;
 - pytest `9.1.1`.
 
-## 2. Scope proof
+## 2. Corrective findings covered
 
-The tested implementation proves:
+This binding run includes tests for all three independent-review findings returned against `e197ab72a...`.
+
+### E1PR002-IR-001 — authoritative source revision
+
+- adjustment source state is persisted server-side;
+- source revision is not caller-authoritative;
+- accepted comparable/market-observation/characteristic writes advance source revision and stale prior CURRENT decisions transactionally;
+- the normalized P0/base input is bound to the authoritative source revision and is invalidated when source data changes;
+- replay of an old caller revision cannot authorize a calculation.
+
+### E1PR002-IR-002 — concurrency-safe decision lifecycle
+
+- selection, stale marking, validation and snapshot persistence use transaction/CAS protection;
+- blind overwrite of a newer human reselection is rejected;
+- run validation is rechecked before snapshot insert;
+- a decision set that becomes stale/reselected cannot persist a snapshot as though the older state were current.
+
+### E1PR002-IR-003 — immutable decision lineage
+
+- `case_id`, `comparable_property_id`, and `factor_key` are immutable after decision insert;
+- persistence rejects re-parenting/re-factoring of an existing decision identity;
+- historical audit rows remain bound to the same immutable decision lineage.
+
+## 3. Frozen behavior preserved
+
+The corrective loop does not redesign the accepted E1-PR-002 calculation contract. It preserves:
 
 - exact frozen C1–C11 order and canonical factor keys;
-- market normalization using deterministic Decimal arithmetic;
-- supplied/precomputed construction aggregate remains an Epic-1 boundary input rather than a CTXD engine;
-- explicit selected `0%` remains a valid decision;
-- missing/unreviewed decision blocks a complete adjustment run;
-- C1 uses `P0`, C2 uses `P1`, and C3–C11 use frozen `P1` as adjustment-amount base;
-- binary floats fail at canonical numeric boundaries;
-- calculation remains deterministic under changed ambient Decimal precision;
-- human rate selection writes current decision state plus append-only selection audit metadata;
-- source-data drift marks a decision `SOURCE_DATA_CHANGED` without overwriting its selected rate;
-- stale or source-revision-mismatched decisions block calculation;
-- complete decision sets produce SHA-bound immutable calculation snapshot records;
-- migration v3 installs case/comparable/decision/audit/snapshot lineage guards;
-- accepted E1-PR-001 manual-data behavior remains green on schema v3.
+- deterministic Decimal-only calculation;
+- explicit selected `0%` distinct from missing/unreviewed;
+- C1 on `P0`, C2 on `P1`, C3–C11 adjustment amounts on frozen `P1`;
+- human-selected rate authority;
+- supplied/precomputed construction aggregate as an Epic-1 boundary input only;
+- provenance-complete Golden decision fixture and exact workbook SHA/source cells;
+- direct-source reproduction of `F108 = 196308350`, `G108 = 227083250`, `H108 = 212201640`.
 
-## 3. Golden decision source proof
+## 4. Run history
 
-The Library reference workbook used for source extraction is:
-
-`(Trunghd_HTG) N08-0038-Huedtl-MTNguyenVanDau-P5-PhuNhuan-htg.xlsx`
-
-Verified workbook SHA-256:
-
-`d410cfcc2263d7d50a436a79e192461f04b6863e6c3676a28da7a2eed287389c`
-
-This exactly matches the workbook SHA already recorded by the canonical Golden Fixture.
-
-The direct stored adjustment decision cells were read from `Bangtinh` columns F/G/H at rows:
-
-`55, 60, 65, 70, 75, 80, 85, 90, 95, 100, 105`.
-
-That yields 33 direct selected-rate source cells for TSSS01/02/03. The versioned fixture is:
-
-`fixtures/GOLDEN_CASE_ADJUSTMENT_DECISIONS_v1.json`
-
-Fixture controls:
-
-- each decision carries exact source cell provenance;
-- each rate is stored as canonical fractional Decimal text;
-- explicit zero is represented as a selected decision;
-- workbook actor metadata is explicitly `NOT_AVAILABLE_IN_SOURCE_WORKBOOK` rather than fabricated;
-- fixture semantic SHA-256 is checked by tests.
-
-Using those direct source rates with the frozen adjustment graph reproduces exactly:
-
-- TSSS01 / `Bangtinh!F108 = 196308350`;
-- TSSS02 / `Bangtinh!G108 = 227083250`;
-- TSSS03 / `Bangtinh!H108 = 212201640`.
-
-No rate was invented, reverse-solved from F108/G108/H108/H119, or inferred from an expected output.
-
-## 4. Superseded run history
-
-Run `32009701673` on HEAD `7d3a527f01c1a9893c11f15edab4dd7dee46d3af` is non-binding.
-
-It established:
-
-- dependency install PASS;
-- diff hygiene PASS;
-- compile PASS;
-- **175 passed / 2 failed** in the full suite.
-
-Both failures were stale E1-PR-001 test assertions that hard-coded `LATEST_SCHEMA_VERSION == 2` and exact migration list `[1,2]`. They did not expose a product calculation failure. The E1-PR-001 guards were corrected narrowly so they continue to verify migration v2 exactly while allowing later strictly ordered migrations. The corrected exact head then produced the binding 177/177 and 27/27 result above.
+- `32009701673`: superseded; 175 passed / 2 failed due stale schema-v2 assertions.
+- `32009934815`: original pre-review binding run; 177/177 full and 27/27 focused PASS, later superseded by corrective implementation.
+- `32017373547`: non-binding corrective attempt; stopped at diff hygiene because prior Markdown hard-break trailing spaces were present.
+- `32017538546`: **binding corrective run**; 184/184 full and 34/34 focused PASS.
 
 ## 5. Claim boundary
 
-This evidence supports only `AdjustmentCalculationGate` / E1-PR-002 behavior.
+This evidence supports only E1-PR-002 / `AdjustmentCalculationGate`.
 
-It does **not** claim:
-
-- comparable-quality / 15% readiness PASS;
-- human final indicated-price selection PASS;
-- final subject valuation PASS;
-- CTXD calculation-engine PASS;
-- workbook generation PASS;
-- Microsoft Excel qualification PASS;
-- Epic 1 closure.
+It does not claim Comparable Quality / 15%, Human Indication, Final Valuation Composition, CTXD engine, workbook generation, Microsoft Excel qualification, or Epic 1 closure.
 
 ## 6. Binding rule
 
-Any source, test, migration, calculation contract, fixture decision value, or persistence behavior change after runtime-tested HEAD `83f742baf42b9f56c887b80c38b15972f22650a4` requires a new full Windows run before acceptance.
+Any source, test, migration, fixture decision value, calculation contract, source-state contract, concurrency behavior, or persistence behavior change after corrective runtime-tested HEAD `74670edb9c5ece5cbd94706808272d6e08a2ee57` requires a new full Windows run before acceptance.
 
-Evidence/report/handoff additions and removal of the one-time verification workflow may form the post-test review delta only if they do not alter implementation-bearing behavior.
+Evidence/report/handoff updates and removal of the one-time corrective workflow may form the post-test review delta only when they do not alter implementation-bearing behavior.
