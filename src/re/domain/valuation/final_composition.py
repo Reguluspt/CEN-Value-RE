@@ -121,6 +121,19 @@ def _whole_vnd(value: Decimal) -> Decimal:
         return value.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
 
 
+def _sum_exact(values: tuple[Decimal, ...]) -> Decimal:
+    if not values:
+        return Decimal("0")
+    required_precision = max(
+        50,
+        sum(len(value.as_tuple().digits) + abs(value.as_tuple().exponent) for value in values)
+        + 24,
+    )
+    with localcontext() as context:
+        context.prec = required_precision
+        return sum(values, Decimal("0"))
+
+
 def compose_final_valuation(
     *,
     rounded_human_indication_vnd_per_m2: DecimalInput,
@@ -162,8 +175,6 @@ def compose_final_valuation(
         raise FinalCompositionValidationError("land component IDs must be unique")
 
     composed: list[ComposedLandComponent] = []
-    compliant_total = Decimal("0")
-    other_total = Decimal("0")
 
     for component in ordered:
         if not component.include_in_final_value:
@@ -208,26 +219,25 @@ def compose_final_valuation(
                 50,
                 len(component.area_m2.as_tuple().digits)
                 + len(unit_price.as_tuple().digits)
+                + abs(component.area_m2.as_tuple().exponent)
+                + abs(unit_price.as_tuple().exponent)
                 + 24,
             )
             amount = component.area_m2 * unit_price
-        row = ComposedLandComponent(
-            component_id=component.component_id,
-            component_order=component.component_order,
-            planning_status=component.planning_status,
-            area_m2=component.area_m2,
-            valuation_basis=component.valuation_basis,
-            effective_unit_price_vnd_per_m2=unit_price,
-            amount_vnd=amount,
-            policy_version=component.policy_version,
-            note=component.note,
-            parcel_id=component.parcel_id,
+        composed.append(
+            ComposedLandComponent(
+                component_id=component.component_id,
+                component_order=component.component_order,
+                planning_status=component.planning_status,
+                area_m2=component.area_m2,
+                valuation_basis=component.valuation_basis,
+                effective_unit_price_vnd_per_m2=unit_price,
+                amount_vnd=amount,
+                policy_version=component.policy_version,
+                note=component.note,
+                parcel_id=component.parcel_id,
+            )
         )
-        composed.append(row)
-        if component.planning_status == "COMPLIANT":
-            compliant_total += amount
-        else:
-            other_total += amount
 
     if not composed:
         raise FinalCompositionValidationError(
@@ -238,8 +248,14 @@ def compose_final_valuation(
             "final composition requires a compliant MARKET_INDICATED land component"
         )
 
-    recognized_land = compliant_total + other_total
-    total_before_rounding = _whole_vnd(recognized_land + construction)
+    compliant_total = _sum_exact(
+        tuple(item.amount_vnd for item in composed if item.planning_status == "COMPLIANT")
+    )
+    other_total = _sum_exact(
+        tuple(item.amount_vnd for item in composed if item.planning_status != "COMPLIANT")
+    )
+    recognized_land = _sum_exact((compliant_total, other_total))
+    total_before_rounding = _whole_vnd(_sum_exact((recognized_land, construction)))
     final_rounding = total_value_rounding_policy.apply(total_before_rounding)
 
     return FinalValuationComposition(
