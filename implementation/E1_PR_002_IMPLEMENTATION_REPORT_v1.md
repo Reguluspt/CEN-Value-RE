@@ -1,8 +1,8 @@
 # E1-PR-002 — Implementation Report v1
 
-**Date:** 2026-08-17  
-**Repository:** `Reguluspt/CEN-Value-RE`  
-**Accepted base:** `c4e5753c328443e63ce474c03ecbbbf31a2370ed`  
+**Date:** 2026-08-17
+**Repository:** `Reguluspt/CEN-Value-RE`
+**Accepted base:** `c4e5753c328443e63ce474c03ecbbbf31a2370ed`
 **Runtime-tested HEAD:** `83f742baf42b9f56c887b80c38b15972f22650a4`
 
 ## Outcome
