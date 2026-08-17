@@ -3,75 +3,72 @@
 **Date:** 2026-08-17
 **Repository:** `Reguluspt/CEN-Value-RE`
 **Accepted base:** `7e60be157e6b0d5300ffaa8dabac1aadc73f96fb`
-**Runtime-tested implementation HEAD:** `c8fd43df4b2f15be430ae2a5dcc9c4f151caba33`
-**Binding GitHub Actions run:** `32037927058`
+**Original reviewed HEAD:** `a558ebd969de227b4433edb0a32333d5babf4667`
+**Corrective runtime-tested implementation HEAD:** `2a6361744a78e5ef573682f569bb093c626c2271`
+**Binding corrective GitHub Actions run:** `32040251279`
 **Gate:** `HumanIndicationGate`
 
 ## 1. Binding environment and result
 
-Run `32037927058` completed SUCCESS on Microsoft Windows Server 2025 with CPython `3.11.9`.
+Run `32040251279` completed SUCCESS on Microsoft Windows Server 2025 with CPython `3.11.9`.
 
 - dependency install: PASS;
 - `git diff --check 7e60be157e6b0d5300ffaa8dabac1aadc73f96fb..HEAD`: PASS;
 - `python -m compileall -q src/re`: PASS;
-- full `tests/re`: **206 passed in 4.78s**;
-- focused E1-PR-003 suite: **20 passed in 0.26s**.
+- full `tests/re`: **212 passed in 3.85s**;
+- focused E1-PR-003 corrective suite: **26 passed in 0.34s**.
 
-Runtime dependency set included Flask `3.1.1`, sqlcipher3 `0.6.2`, pywin32 `312`, and pytest `9.1.1`.
+Runtime dependencies included Flask `3.1.1`, sqlcipher3 `0.6.2`, pywin32 `312`, and pytest `9.1.1`.
 
-GitHub Actions checked out PR merge commit `cab6bcb7e55ad670a1c231747af7a1d192c6b3b6`. Its tree SHA is `8808d6d345aba43d994152fd7f55f19373c1ef51`, exactly equal to runtime-tested branch HEAD `c8fd43df4b2f15be430ae2a5dcc9c4f151caba33` tree SHA `8808d6d345aba43d994152fd7f55f19373c1ef51`. The tested tree therefore contains exactly the implementation under review plus the accepted base, with no merge-only content difference.
+GitHub Actions checked out PR merge-ref `5daa5d6fb4596c2abd34f3a8c97616f7279e828a`. Its tree SHA is `ad7af1357666efb189b28070f231ebbbd2e9e056`, exactly equal to corrective runtime-tested branch HEAD `2a6361744a78e5ef573682f569bb093c626c2271` tree SHA `ad7af1357666efb189b28070f231ebbbd2e9e056`.
 
-## 2. Capability evidence
+## 2. Corrective finding F-01 evidence
 
-The binding run covers:
+Independent review returned one HIGH finding: caller-supplied `TEMPLATE_DEFAULT` provenance could previously carry an N08 profile ID/version while supplying a non-profile increment such as `10,000`, producing `196310000` instead of the frozen N08 default `196308000`.
 
-- Golden comparable quality metrics from accepted E1-PR-002 adjustment snapshots;
-- explicit selected `0%` retained as a decision while excluded from adjustment count/amplitude;
-- Decimal-only gross/net/count/amplitude calculation;
-- inclusive `<= 15%` readiness tests for exact-boundary, inside, and outside cases;
-- advisory unique-minimum-gross recommendation;
-- frozen zero-gross tie-average branch;
-- equal non-zero minimum-gross tie remaining ambiguous rather than inventing a general averaging rule;
-- human selection of any current comparable without arbitrary caller-supplied final numeric price;
-- explicit human actor/reason/time authority;
-- raw and rounded indicated unit price kept separately;
-- N08-0038 template-default 1,000 VND/m² rounding;
-- case-level UNIT_PRICE rounding override including selected-by/selected-at audit metadata;
-- exact case/profile binding for template-default rounding;
-- migration v4 immutable human-indication snapshot and immutable three-source adjustment evidence bindings;
-- semantic SHA reconstruction from immutable human-indication content;
-- stale adjustment evidence rejection after rate reselection;
-- historical human snapshot reproducibility after source drift while `resolve_current_indication()` fails closed until a new human confirmation binds current adjustment evidence.
+The corrective implementation now:
 
-## 3. Golden proof
+- declares rounding defaults inside the trusted `ExcelTemplateProfile` definition;
+- declares N08-0038 `UNIT_PRICE = NEAREST / 1,000 VND` and `TOTAL_VALUE = NEAREST / 1,000,000 VND` in `N08_0038_PROFILE`;
+- exposes trusted profile defaults to the application through `TemplateRoundingDefaultResolver` in the Excel port, preserving the core-to-adapter boundary;
+- requires `ComparableQualityService` to resolve `TEMPLATE_DEFAULT` against the trusted case profile;
+- validates exact profile ID/version, target, mode, and increment;
+- fails closed if no trusted resolver/default exists or any field differs;
+- preserves `CASE_OVERRIDE` behavior with actor/time audit metadata.
 
-Using the provenance-complete Golden C1–C11 fixture accepted in E1-PR-002, the focused suite reproduces:
+Regression proof includes:
 
-- TSSS01: count `2`, gross `34642650`, net `-34642650`, amplitude `5–10`, indicated `196308350`;
-- TSSS02: count `4`, gross `83662250`, net `-11951750`, amplitude `5–15`, indicated `227083250`;
-- TSSS03: count `4`, gross `35366940`, net `15718640`, amplitude `3–5`, indicated `212201640`;
-- Golden human selected/raw indication: `196308350`;
-- N08 template-default rounded indication: `196308000`.
+- N08 + `TEMPLATE_DEFAULT` + `1,000` accepted and Golden `196308350 -> 196308000` preserved;
+- N08 + `TEMPLATE_DEFAULT` + `NONE` rejected;
+- N08 + `TEMPLATE_DEFAULT` + `10,000` rejected;
+- N08 + `CASE_OVERRIDE` + `10,000` with actor/time accepted and persisted as `196310000` with `CASE_OVERRIDE` provenance;
+- resolver absence/unknown profile/unknown target fails closed;
+- architecture guard remains green, so application/ports do not import Excel adapters.
 
-The accepted E1-PR-002 Golden source workbook SHA and direct decision-cell provenance are consumed unchanged; E1-PR-003 does not introduce or reverse-solve any adjustment rate.
+## 3. Previously accepted behavior preserved
 
-## 4. Run history / supersession
+The binding run continues to cover comparable quality, inclusive 15% readiness, advisory recommendation, frozen zero-gross average behavior, human authority, current-adjustment freshness, immutable human-indication evidence, semantic SHA reconstruction, source-drift/reselection reconfirmation, and Golden E1-PR-002 provenance without change.
 
-- `32036909796`: non-binding; stopped at diff hygiene because the initial contract Markdown contained trailing whitespace.
-- `32036989649`: non-binding; full suite reached `200 passed / 2 failed`, exposing one precision-sensitive test literal and one forward-compatibility schema assertion; both were corrected.
-- `32037384853`: successful intermediate run (`204/204` full, `18/18` focused) but **superseded** by later hardening of complete `RoundingPolicy` snapshot metadata and current-human-indication freshness.
-- `32037927058`: **binding final implementation run**, `206/206` full and `20/20` focused PASS.
+Golden outputs remain:
 
-Any other workflow run from an intermediate E1-PR-003 commit is non-binding. Only run `32037927058` binds the final implementation behavior.
+- TSSS01 indicated `196308350`;
+- TSSS02 indicated `227083250`;
+- TSSS03 indicated `212201640`;
+- selected/raw human indication `196308350`;
+- N08 trusted template-default rounded indication `196308000`.
+
+## 4. Superseded evidence
+
+Run `32037927058` and runtime HEAD `c8fd43df4b2f15be430ae2a5dcc9c4f151caba33` are superseded by the F-01 corrective changes and are no longer binding for acceptance.
+
+Only run `32040251279` binds the corrective implementation.
 
 ## 5. Claim boundary
 
-This evidence supports only E1-PR-003 / `HumanIndicationGate`.
-
-It does not claim E1-PR-004 final valuation composition, CTXD engine, workbook generation, Microsoft Excel qualification, OCR/Maps, Historical Learning, approval round-trip, full Astryx workbench, or Epic 1 closure.
+This evidence supports only E1-PR-003 / `HumanIndicationGate`. It does not claim E1-PR-004 final valuation composition, CTXD engine, workbook generation, Microsoft Excel qualification, OCR/Maps, Historical Learning, approval round-trip, full Astryx workbench, or Epic 1 closure.
 
 ## 6. Post-test binding rule
 
-After runtime-tested HEAD `c8fd43df4b2f15be430ae2a5dcc9c4f151caba33`, only evidence/report/handoff updates and removal of the one-time E1-PR-003 verifier may be present before independent review.
+After corrective runtime-tested HEAD `2a6361744a78e5ef573682f569bb093c626c2271`, only evidence/report/handoff updates and removal of `.github/workflows/e1-pr-003-corrective-verify.yml` may be present before independent re-review.
 
-Any post-test change to source, tests, migration, domain contract, persistence behavior, rounding behavior, freshness semantics, Golden values, dependencies, or runtime-bearing configuration invalidates run `32037927058` and requires a new full Windows run.
+Any post-test change to source, tests, profile definition, ports, domain/application contract, persistence behavior, Golden values, dependencies, or runtime-bearing configuration invalidates run `32040251279` and requires a new full Windows run.
