@@ -85,7 +85,9 @@ def _sha256_json(payload: object) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
-def _decision_fingerprint(records: tuple[AdjustmentDecisionRecord, ...]) -> tuple[tuple[object, ...], ...]:
+def _decision_fingerprint(
+    records: tuple[AdjustmentDecisionRecord, ...]
+) -> tuple[tuple[object, ...], ...]:
     return tuple(
         (
             item.id,
@@ -126,11 +128,13 @@ class MarketAdjustmentService:
         normalized_base_price_vnd_per_m2: DecimalInput,
         evidence_ref: str,
     ) -> AdjustmentSourceStateRecord:
-        """Bind a supplied/derived P0 to the current authoritative source revision.
+        """Bind P0 to authoritative source state.
 
-        E1-PR-002 does not invent the CTXD engine. P0 may therefore be supplied
-        or derived upstream, but it must be persisted with explicit evidence and
-        an exact authoritative source revision before any adjustment run.
+        The first binding attaches P0 to the current revision. Repeating the exact
+        same P0/evidence pair is idempotent. A materially different P0/evidence
+        binding is itself source drift: persistence advances the authoritative
+        revision, preserves selected rates but marks CURRENT decisions stale, and
+        appends SOURCE_DATA_CHANGED audit evidence atomically.
         """
 
         case_id = _require_text(case_id, "case_id")
@@ -190,7 +194,10 @@ class MarketAdjustmentService:
                     case_id, comparable_property_id, self._now()
                 )
                 authoritative_revision = str(state.source_revision)
-                if source_data_revision is not None and str(source_data_revision) != authoritative_revision:
+                if (
+                    source_data_revision is not None
+                    and str(source_data_revision) != authoritative_revision
+                ):
                     raise MarketAdjustmentConflictError(
                         "Caller source-data revision does not match authoritative current revision"
                     )
@@ -259,13 +266,7 @@ class MarketAdjustmentService:
         comparable_property_id: str,
         new_source_data_revision: str | None = None,
     ) -> tuple[AdjustmentDecisionRecord, ...]:
-        """Reconcile decisions with authoritative state; caller cannot advance revision.
-
-        Canonical source writes advance ``adjustment_source_state`` through DB
-        triggers in the same source transaction. This method only observes that
-        authoritative revision and applies CAS staleness if a non-triggering
-        adapter ever needs reconciliation.
-        """
+        """Reconcile decisions with authoritative state; caller cannot advance revision."""
 
         case_id = _require_text(case_id, "case_id")
         comparable_property_id = _require_text(
@@ -278,7 +279,10 @@ class MarketAdjustmentService:
                     case_id, comparable_property_id, self._now()
                 )
                 authoritative_revision = str(state.source_revision)
-                if new_source_data_revision is not None and str(new_source_data_revision) != authoritative_revision:
+                if (
+                    new_source_data_revision is not None
+                    and str(new_source_data_revision) != authoritative_revision
+                ):
                     raise MarketAdjustmentConflictError(
                         "Caller cannot set source-data revision; canonical source state is authoritative"
                     )
@@ -355,7 +359,10 @@ class MarketAdjustmentService:
                         "Adjustment source state has not been established"
                     )
                 authoritative_revision = str(state.source_revision)
-                if source_data_revision is not None and str(source_data_revision) != authoritative_revision:
+                if (
+                    source_data_revision is not None
+                    and str(source_data_revision) != authoritative_revision
+                ):
                     raise MarketAdjustmentConflictError(
                         "Caller source-data revision does not match authoritative current revision"
                     )
@@ -417,9 +424,15 @@ class MarketAdjustmentService:
                     {
                         "factor_key": step.factor_key,
                         "selected_rate_fraction": format(step.selected_rate, "f"),
-                        "amount_base_vnd_per_m2": format(step.amount_base_vnd_per_m2, "f"),
-                        "adjustment_amount_vnd_per_m2": format(step.adjustment_amount_vnd_per_m2, "f"),
-                        "running_price_vnd_per_m2": format(step.running_price_vnd_per_m2, "f"),
+                        "amount_base_vnd_per_m2": format(
+                            step.amount_base_vnd_per_m2, "f"
+                        ),
+                        "adjustment_amount_vnd_per_m2": format(
+                            step.adjustment_amount_vnd_per_m2, "f"
+                        ),
+                        "running_price_vnd_per_m2": format(
+                            step.running_price_vnd_per_m2, "f"
+                        ),
                     }
                     for step in result.steps
                 ]
@@ -442,16 +455,16 @@ class MarketAdjustmentService:
                 }
                 semantic_sha256 = _sha256_json(semantic_payload)
 
-                # Re-read authoritative state and every decision immediately before
-                # persistence. This catches fake/non-locking UoWs and complements
-                # BEGIN IMMEDIATE serialization in SQLCipherUnitOfWork.
                 state_now = self._uow.adjustment_source_states.get(
                     case_id, comparable_property_id
                 )
                 records_now = self._uow.adjustment_decision_queries.list_for_comparable(
                     case_id, comparable_property_id
                 )
-                if state_now != state or _decision_fingerprint(records_now) != initial_fingerprint:
+                if (
+                    state_now != state
+                    or _decision_fingerprint(records_now) != initial_fingerprint
+                ):
                     raise MarketAdjustmentConflictError(
                         "Adjustment source or human decisions changed during calculation"
                     )
@@ -467,6 +480,7 @@ class MarketAdjustmentService:
                         normalized_base_price_vnd_per_m2=semantic_payload[
                             "normalized_base_price_vnd_per_m2"
                         ],
+                        normalized_base_evidence_ref=state.normalized_base_evidence_ref,
                         property_adjustment_base_vnd_per_m2=semantic_payload[
                             "property_adjustment_base_vnd_per_m2"
                         ],
