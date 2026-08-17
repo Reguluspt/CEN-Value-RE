@@ -12,6 +12,7 @@ from .profile import (
     FormulaSignature,
     SheetRequirement,
     SheetState,
+    TemplateRoundingDefault,
 )
 
 
@@ -106,6 +107,11 @@ _N08_TRANSFORMATIONS = (
     ),
 )
 
+_N08_ROUNDING_DEFAULTS = (
+    TemplateRoundingDefault("UNIT_PRICE", "NEAREST", 1_000),
+    TemplateRoundingDefault("TOTAL_VALUE", "NEAREST", 1_000_000),
+)
+
 
 N08_0038_PROFILE = ExcelTemplateProfile(
     profile_id="cenvalue-re-n08-0038-v1",
@@ -118,6 +124,7 @@ N08_0038_PROFILE = ExcelTemplateProfile(
     # Gate-B v1 names no concrete required named/control ranges.  The schema
     # supports them and will fail closed as soon as a profile declares them.
     required_controls=(),
+    rounding_defaults=_N08_ROUNDING_DEFAULTS,
     external_link_policy=ExternalLinkPolicy(
         allowed_states=frozenset(
             {
