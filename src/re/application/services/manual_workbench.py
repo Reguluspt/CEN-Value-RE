@@ -7,9 +7,11 @@ Excel writer implementations.
 
 from __future__ import annotations
 
+import hashlib
+import json
 from dataclasses import dataclass
-from typing import Protocol
 
+from ...domain.adjustment import N08_FACTOR_KEYS
 from ...domain.common.rounding import (
     RoundingMode,
     RoundingPolicy,
@@ -18,8 +20,13 @@ from ...domain.common.rounding import (
     TOTAL_VALUE_TARGET,
     UNIT_PRICE_TARGET,
 )
-from ...ports.adjustment_persistence import AdjustmentPersistenceUnitOfWork
+from ...ports.adjustment_persistence import (
+    AdjustmentCalculationSnapshotRecord,
+    AdjustmentPersistenceUnitOfWork,
+)
+from ...ports.adjustment_source import AdjustmentSourceStateRecord
 from ...ports.excel import TemplateRoundingDefaultResolver
+from ...ports.persistence import AdjustmentDecisionRecord
 from .comparable_quality import ComparableQualityService
 from .final_valuation import FinalValuationService
 from .market_adjustment import MarketAdjustmentService
@@ -46,22 +53,78 @@ class ManualWorkbenchExportError(ManualWorkbenchError):
     pass
 
 
-class WorkbenchComparable(Protocol):
-    property_id: str
-    comparable_order: int
-    archived_at: str | None
-
-
 @dataclass(frozen=True, slots=True)
 class WorkbenchProfileBinding:
     profile_id: str
     profile_version: str
 
 
+@dataclass(frozen=True, slots=True)
+class CurrentAdjustmentState:
+    """Resumable, non-calculating view of one comparable adjustment state."""
+
+    case_id: str
+    comparable_property_id: str
+    comparable_order: int
+    source_state: AdjustmentSourceStateRecord | None
+    decisions: tuple[AdjustmentDecisionRecord, ...]
+    current_run: AdjustmentCalculationSnapshotRecord | None
+
+
 def _required_text(value: str, field_name: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise ManualWorkbenchValidationError(f"{field_name} must be non-empty")
     return value.strip()
+
+
+def _sha256_json(payload: object) -> str:
+    encoded = json.dumps(
+        payload,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _decision_set_sha256(records: tuple[AdjustmentDecisionRecord, ...]) -> str:
+    return _sha256_json(
+        [
+            {
+                "id": item.id,
+                "factor_key": item.factor_key,
+                "selected_rate_pct": item.selected_rate_pct,
+                "selected_explicitly": item.selected_explicitly,
+                "source_data_revision": item.source_data_revision,
+                "review_status": item.review_status,
+                "selected_at": item.selected_at,
+                "version": item.version,
+            }
+            for item in records
+        ]
+    )
+
+
+def _snapshot_semantic_sha256(record: AdjustmentCalculationSnapshotRecord) -> str | None:
+    try:
+        steps = json.loads(record.ordered_steps_json)
+    except Exception:
+        return None
+    if not isinstance(steps, list):
+        return None
+    return _sha256_json(
+        {
+            "case_id": record.case_id,
+            "comparable_property_id": record.comparable_property_id,
+            "source_data_revision": record.source_data_revision,
+            "normalized_base_price_vnd_per_m2": record.normalized_base_price_vnd_per_m2,
+            "normalized_base_evidence_ref": record.normalized_base_evidence_ref,
+            "property_adjustment_base_vnd_per_m2": record.property_adjustment_base_vnd_per_m2,
+            "indicated_unit_price_vnd_per_m2": record.indicated_unit_price_vnd_per_m2,
+            "decision_set_sha256": record.decision_set_sha256,
+            "steps": steps,
+        }
+    )
 
 
 class ManualWorkbenchService:
@@ -159,12 +222,68 @@ class ManualWorkbenchService:
             profile_version=trusted.profile_version,
         )
 
-    def adjustment_state(self, *, case_id: str, comparable_order: int):
+    def adjustment_state(
+        self, *, case_id: str, comparable_order: int
+    ) -> CurrentAdjustmentState:
         comparable_id = self._comparable_id(case_id, comparable_order)
-        return self._market_adjustment.read_state(
-            case_id=case_id,
-            comparable_property_id=comparable_id,
-        )
+        try:
+            with self._uow.atomic():
+                source = self._uow.adjustment_source_states.get(case_id, comparable_id)
+                decisions = self._uow.adjustment_decision_queries.list_for_comparable(
+                    case_id, comparable_id
+                )
+                snapshots = self._uow.adjustment_calculation_snapshots.list_for_comparable(
+                    case_id, comparable_id
+                )
+                current_run = None
+                if source is not None and snapshots:
+                    revision = str(source.source_revision)
+                    decisions_complete = (
+                        tuple(item.factor_key for item in decisions) == N08_FACTOR_KEYS
+                        and all(
+                            item.archived_at is None
+                            and item.selected_explicitly
+                            and item.selected_rate_pct is not None
+                            and item.review_status == "CURRENT"
+                            and item.source_data_revision == revision
+                            for item in decisions
+                        )
+                    )
+                    source_bound = (
+                        source.normalized_base_price_vnd_per_m2 is not None
+                        and source.normalized_base_bound_revision == source.source_revision
+                        and bool(source.normalized_base_evidence_ref)
+                    )
+                    if decisions_complete and source_bound:
+                        latest = snapshots[-1]
+                        expected_decision_sha = _decision_set_sha256(decisions)
+                        if (
+                            latest.case_id == case_id
+                            and latest.comparable_property_id == comparable_id
+                            and latest.source_data_revision == revision
+                            and latest.normalized_base_price_vnd_per_m2
+                            == source.normalized_base_price_vnd_per_m2
+                            and latest.normalized_base_evidence_ref
+                            == source.normalized_base_evidence_ref
+                            and latest.decision_set_sha256 == expected_decision_sha
+                            and _snapshot_semantic_sha256(latest)
+                            == latest.semantic_sha256
+                        ):
+                            current_run = latest
+                return CurrentAdjustmentState(
+                    case_id=case_id,
+                    comparable_property_id=comparable_id,
+                    comparable_order=comparable_order,
+                    source_state=source,
+                    decisions=decisions,
+                    current_run=current_run,
+                )
+        except ManualWorkbenchError:
+            raise
+        except Exception as exc:
+            raise ManualWorkbenchConflictError(
+                "Current adjustment state could not be read consistently"
+            ) from exc
 
     def bind_adjustment_base(
         self,
