@@ -12,7 +12,10 @@ from src.re.adapters.excel_output.openpyxl_writer import (
     WorkbookSourceHashMismatchError,
     WorkbookWriteContractError,
 )
-from src.re.adapters.excel_output.profile import WorkbookValueKind
+from src.re.adapters.excel_output.profile import (
+    WorkbookValueKind,
+    WorkbookWriteBinding,
+)
 from src.re.ports.workbook_output import WorkbookGenerationSourceBinding
 
 
@@ -32,6 +35,7 @@ def _synthetic_n08(path: Path, *, bad_g181=False, unknown_external=False):
     if bad_g181:
         workbook["Bangtinh"]["G181"] = "=1"
     workbook["Phieu TTTT"]["E5"] = "='[1]Nhập liệu'!F9"
+    workbook["Phieu TTTT"]["B18"] = "=ROUND(B15*B19,-7)"
     if unknown_external:
         workbook["Sheet1"]["Z99"] = "='[other.xlsx]Data'!A1"
     else:
@@ -40,14 +44,16 @@ def _synthetic_n08(path: Path, *, bad_g181=False, unknown_external=False):
     workbook.close()
 
 
-def _values():
+def _values(profile=N08_0038_OUTPUT_PROFILE):
     values = {}
     for binding in (
-        *N08_0038_OUTPUT_PROFILE.write_bindings,
-        *N08_0038_OUTPUT_PROFILE.compatibility_bindings,
+        *profile.write_bindings,
+        *profile.compatibility_bindings,
     ):
         if binding.value_kind is WorkbookValueKind.TEXT:
-            values[binding.source_key] = "Tp. HCM" if binding.source_key == "subject.province" else "TEXT"
+            values[binding.source_key] = (
+                "Tp. HCM" if binding.source_key == "subject.province" else "TEXT"
+            )
         elif binding.value_kind is WorkbookValueKind.FRACTION:
             values[binding.source_key] = "0.05"
         else:
@@ -59,6 +65,7 @@ def _writer_for_source(source: Path):
     profile = replace(
         N08_0038_OUTPUT_PROFILE,
         source_exemplar_sha256=_file_sha(source),
+        fixed_source_bindings=(),
     )
     return OpenPyxlWorkbookOutputWriter((profile,)), profile
 
@@ -84,7 +91,7 @@ def test_writer_is_copy_on_write_allowlisted_and_deterministic(tmp_path):
         profile_version=profile.profile_version,
         template_path=str(source),
         output_path=str(output_a),
-        values=_values(),
+        values=_values(profile),
         source_binding=_binding(),
         generated_at="2026-08-18T08:00:00Z",
     )
@@ -93,7 +100,7 @@ def test_writer_is_copy_on_write_allowlisted_and_deterministic(tmp_path):
         profile_version=profile.profile_version,
         template_path=str(source),
         output_path=str(output_b),
-        values=_values(),
+        values=_values(profile),
         source_binding=_binding(),
         generated_at="2026-08-18T08:00:00Z",
     )
@@ -111,6 +118,7 @@ def test_writer_is_copy_on_write_allowlisted_and_deterministic(tmp_path):
     try:
         assert generated["Sheet1"]["Z99"].value == "UNKNOWN-SENTINEL"
         assert generated["Phieu TTTT"]["E5"].value == "Tp. HCM"
+        assert generated["Phieu TTTT"]["B18"].value == "=ROUND(B15*B19,-7)"
         for signature in profile.template_profile.formula_signatures:
             sheet, coordinate = signature.cell.rsplit("!", 1)
             assert generated[sheet][coordinate].value == signature.formula
@@ -130,7 +138,7 @@ def test_writer_rejects_in_place_and_existing_output(tmp_path):
             profile_version=profile.profile_version,
             template_path=str(source),
             output_path=str(source),
-            values=_values(),
+            values=_values(profile),
             source_binding=_binding(),
             generated_at="2026-08-18T08:00:00Z",
         )
@@ -143,7 +151,7 @@ def test_writer_rejects_in_place_and_existing_output(tmp_path):
             profile_version=profile.profile_version,
             template_path=str(source),
             output_path=str(output),
-            values=_values(),
+            values=_values(profile),
             source_binding=_binding(),
             generated_at="2026-08-18T08:00:00Z",
         )
@@ -173,7 +181,7 @@ def test_source_sha_and_structural_fingerprint_both_fail_closed(tmp_path):
             profile_version=mutated_profile.profile_version,
             template_path=str(mutated),
             output_path=str(tmp_path / "fingerprint-fail.xlsx"),
-            values=_values(),
+            values=_values(mutated_profile),
             source_binding=_binding(),
             generated_at="2026-08-18T08:00:00Z",
         )
@@ -189,7 +197,35 @@ def test_unknown_external_dependency_fails_closed(tmp_path):
             profile_version=profile.profile_version,
             template_path=str(source),
             output_path=str(tmp_path / "external-fail.xlsx"),
-            values=_values(),
+            values=_values(profile),
+            source_binding=_binding(),
+            generated_at="2026-08-18T08:00:00Z",
+        )
+
+
+def test_any_runtime_formula_target_is_read_only_without_declared_transformation(tmp_path):
+    source = tmp_path / "source.xlsx"
+    _synthetic_n08(source)
+    _, base_profile = _writer_for_source(source)
+    formula_binding = WorkbookWriteBinding(
+        cell="Phieu TTTT!B18",
+        source_key="dangerous.negotiated_price",
+        value_kind=WorkbookValueKind.DECIMAL,
+    )
+    profile = replace(
+        base_profile,
+        write_bindings=(*base_profile.write_bindings, formula_binding),
+    )
+    writer = OpenPyxlWorkbookOutputWriter((profile,))
+    values = _values(profile)
+    values["dangerous.negotiated_price"] = "18280000000"
+    with pytest.raises(WorkbookWriteContractError, match="source formula cell"):
+        writer.generate(
+            profile_id=profile.profile_id,
+            profile_version=profile.profile_version,
+            template_path=str(source),
+            output_path=str(tmp_path / "formula-fail.xlsx"),
+            values=values,
             source_binding=_binding(),
             generated_at="2026-08-18T08:00:00Z",
         )
