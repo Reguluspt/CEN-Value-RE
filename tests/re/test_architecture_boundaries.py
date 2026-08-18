@@ -29,6 +29,7 @@ DOMAIN_FORBIDDEN_PREFIXES = (
 )
 CORE_FORBIDDEN_PREFIXES = (
     "re.adapters",
+    "openpyxl",
 )
 
 
@@ -116,14 +117,14 @@ def test_domain_has_no_framework_or_adapter_dependencies() -> None:
     assert not violations, "Forbidden domain imports:\n" + "\n".join(violations)
 
 
-def test_core_layers_do_not_import_adapters() -> None:
+def test_core_layers_do_not_import_adapters_or_workbook_runtime() -> None:
     violations: list[str] = []
     for root in CORE_ROOTS:
         for path in _python_files(root):
             for module in _imports(path):
                 if _starts_with_any(module, CORE_FORBIDDEN_PREFIXES):
                     violations.append(f"{path.relative_to(RE_ROOT)} -> {module}")
-    assert not violations, "Core-to-adapter imports:\n" + "\n".join(violations)
+    assert not violations, "Core boundary imports:\n" + "\n".join(violations)
 
 
 def test_adapter_import_spellings_are_canonicalized_and_blocked() -> None:
@@ -140,6 +141,11 @@ def test_adapter_import_spellings_are_canonicalized_and_blocked() -> None:
         assert any(
             _starts_with_any(module, CORE_FORBIDDEN_PREFIXES) for module in modules
         ), f"Adapter import escaped guard: {source!r} -> {modules!r}"
+
+
+def test_workbook_runtime_import_is_blocked_from_core() -> None:
+    modules = _imports_from_tree(ast.parse("import openpyxl"), "re.application.services")
+    assert any(_starts_with_any(module, CORE_FORBIDDEN_PREFIXES) for module in modules)
 
 
 def test_non_adapter_core_import_is_not_false_positive() -> None:
@@ -162,6 +168,7 @@ def test_expected_bounded_context_packages_exist() -> None:
         "ports",
         "adapters/persistence",
         "adapters/excel",
+        "adapters/excel_output",
         "adapters/providers",
     )
     missing = [name for name in required if not (RE_ROOT / name).is_dir()]
