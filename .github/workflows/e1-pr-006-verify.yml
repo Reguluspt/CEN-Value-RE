@@ -48,7 +48,7 @@ jobs:
 
       - name: Focused E1-PR-006 backend proof
         shell: pwsh
-        run: python -m pytest -q tests/re/test_manual_workbench_integration.py tests/re/test_manual_case_data_backbone.py tests/re/test_architecture_boundaries.py
+        run: python -m pytest -q tests/re/test_manual_workbench_integration.py tests/re/test_manual_workbench_live_runtime.py tests/re/test_manual_case_data_backbone.py tests/re/test_local_service_boundary.py tests/re/test_architecture_boundaries.py
 
       - name: Install frontend dependencies
         working-directory: web
