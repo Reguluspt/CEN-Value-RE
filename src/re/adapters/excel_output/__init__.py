@@ -11,6 +11,7 @@ from .openpyxl_writer import (
 )
 from .profile import (
     WorkbookCompatibilityBinding,
+    WorkbookFixedSourceBinding,
     WorkbookOutputConsumer,
     WorkbookOutputProfile,
     WorkbookValueKind,
@@ -25,6 +26,7 @@ __all__ = [
     "SUPPORTED_WORKBOOK_OUTPUT_PROFILES",
     "UnsupportedWorkbookOutputProfileError",
     "WorkbookCompatibilityBinding",
+    "WorkbookFixedSourceBinding",
     "WorkbookOutputConsumer",
     "WorkbookOutputError",
     "WorkbookOutputProfile",
