@@ -203,13 +203,14 @@ def _fixture():
         for index in range(1, 4)
     )
     asking = ("21500000000", "88000000000", "38000000000")
-    negotiated = ("18275000000", "74800000000", "32300000000")
+    negotiated = ("18280000000", "74800000000", "32300000000")
     observations = tuple(
         MarketObservationRecord(
             id=f"obs-{index}",
             comparable_property_id=f"comp-{index}",
             asking_or_sale_price_vnd=asking[index - 1],
             negotiated_price_vnd=negotiated[index - 1],
+            negotiation_rate_pct="0.15",
             created_at="t",
             updated_at="t",
         )
@@ -325,9 +326,11 @@ def test_service_builds_writer_payload_only_from_current_canonical_state():
     assert writer.call["profile_version"] == "1"
     assert writer.call["source_binding"].final_valuation_snapshot_id == "final-1"
     assert writer.call["source_binding"].final_valuation_semantic_sha256 == "e" * 64
+    assert values["subject.total_area_m2"] == "103.2"
     assert values["subject.compliant_area_m2"] == "82.93"
     assert values["subject.noncompliant_area_m2"] == "20.27"
     assert values["subject.noncompliant_unit_price"] == "106000000"
+    assert values["comparable.1.negotiated_price"] == "18280000000"
     assert values["comparable.1.transaction_success_factor"] == "0.85"
     assert values["adjustment.1.C1.selected_rate"] == "0"
     assert values["adjustment.1.C4.selected_rate"] == "-0.10"
@@ -368,6 +371,26 @@ def test_service_fails_closed_when_any_adjustment_decision_is_stale():
         writer=_Writer(),
     )
     with pytest.raises(WorkbookOutputPrerequisiteError, match="not a current explicit human decision"):
+        service.generate(
+            case_id="case-1",
+            template_path="template.xlsx",
+            output_path="output.xlsx",
+        )
+
+
+def test_service_never_reverse_solves_transaction_factor_from_rounded_price():
+    uow, final = _fixture()
+    observation = uow.market_observations.records["comp-1"]
+    uow.market_observations.records["comp-1"] = replace(
+        observation,
+        negotiation_rate_pct=None,
+    )
+    service = WorkbookOutputService(
+        uow,
+        final_valuation=_FinalResolver(final),
+        writer=_Writer(),
+    )
+    with pytest.raises(WorkbookOutputPrerequisiteError, match="negotiation rate"):
         service.generate(
             case_id="case-1",
             template_path="template.xlsx",
