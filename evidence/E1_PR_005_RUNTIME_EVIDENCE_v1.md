@@ -22,11 +22,11 @@ Run `32107305776` completed SUCCESS on Microsoft Windows Server 2025 with CPytho
 
 GitHub Actions checked out PR merge-ref `1386a3e34503b6f7a0f4c0c7afcebccd6e047955`. Its tree SHA is `a1a2a03c9ac148b7f145261a500b8407b84b4a1e`, exactly equal to corrective runtime-tested HEAD `3455c2353fbe8d0ef6ffab5adad91c9f88a85a9d` tree SHA `a1a2a03c9ac148b7f145261a500b8407b84b4a1e`.
 
-## 2. Corrective finding evidence
+## 2. Corrective evidence for independent re-review
 
 ### E1PR005-IR-001 — coherent canonical payload binding
 
-Corrective orchestration now uses three phases:
+The corrective implementation now uses three phases:
 
 1. resolve the authoritative current final-valuation snapshot;
 2. freeze all canonical workbook payload reads under one `WorkbookOutputUnitOfWork.atomic()` boundary (`BEGIN IMMEDIATE` in SQLCipher);
@@ -52,6 +52,8 @@ Windows focused tests prove the three reviewer-requested vectors:
 1. a foreign destination sentinel created after initial validation but before publication remains byte-for-byte unchanged and generation rejects;
 2. two attempts racing for the same output yield exactly one success and one rejection, with the winner artifact intact and no temp leakage;
 3. an injected `Workbook.save()` failure after temp creation removes the owned partial temp while preserving a foreign destination.
+
+Independent re-review must decide whether IR-001 and IR-002 are CLOSED.
 
 ## 3. Preserved accepted behavior
 
