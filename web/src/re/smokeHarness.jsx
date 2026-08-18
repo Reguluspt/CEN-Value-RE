@@ -133,7 +133,7 @@ globalThis.fetch = async (input, init = {}) => {
   requests.push({ path: url.pathname, method, headers, body });
 
   let status = 200;
-  let payload = null;
+  let payload;
 
   if (url.pathname === '/api/re/manual-cases' && method === 'POST') {
     payload = persistedSnapshot;
