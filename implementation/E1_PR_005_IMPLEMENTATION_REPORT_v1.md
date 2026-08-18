@@ -3,150 +3,96 @@
 **Date:** 2026-08-18
 **Repository:** `Reguluspt/CEN-Value-RE`
 **Accepted base:** `f14018b19afcdb1cf600f46524e18f8ea2d3f4de`
-**Runtime-tested implementation HEAD:** `0c3b693d272befde32da8f1521b4acf390fe592a`
-**Binding Windows run:** `32089429684`
+**Original reviewed HEAD:** `87069ec05a11d5bbc98656def46c16aaecba6f1f`
+**Corrective runtime-tested HEAD:** `3455c2353fbe8d0ef6ffab5adad91c9f88a85a9d`
+**Binding Windows run:** `32107305776`
 **Gate:** `WorkbookGenerationGate`
 
 ## Outcome
 
-E1-PR-005 implements the bounded Epic 1 supported-profile workbook generation slice for `cenvalue-re-n08-0038-v1@1`.
+E1-PR-005 implements the bounded supported-profile workbook generation slice for `cenvalue-re-n08-0038-v1@1`. The targeted corrective loop closes the two independent-review findings without redesigning the already accepted profile, formula, Gate B.10 or qualification boundaries.
 
-Excel remains an output/compatibility surface. CenValue canonical application/domain state remains authority. The implementation does not claim Excel Desktop qualification or Epic 1 closure.
+Excel remains an output/compatibility surface. CenValue canonical state remains calculation authority. No Microsoft Excel Desktop qualification or Epic 1 closure is claimed.
 
-## Output architecture
+## Corrective closure — IR-001 coherent payload provenance
 
-A new framework-independent boundary in `src/re/ports/workbook_output.py` exposes generation without leaking workbook runtime dependencies into the core layers.
+The original application flow could resolve a current final valuation and then build the workbook payload after that resolver transaction ended. A concurrent canonical change could therefore make the final snapshot stale while later reads supplied newer payload values.
 
-The concrete writer lives in `src/re/adapters/excel_output/` and uses pinned `openpyxl==3.1.5`. Architecture tests explicitly prevent `openpyxl` or concrete adapter imports from domain/application/ports.
+The corrected `WorkbookOutputService.generate()` now:
 
-The existing `src/re/adapters/excel/` profile/fingerprint package remains the pure structural contract and is reused rather than redesigned.
+1. resolves the authoritative current final valuation;
+2. freezes all workbook payload inputs under one `WorkbookOutputUnitOfWork.atomic()` transaction;
+3. freezes the case profile and final snapshot source binding with that payload;
+4. releases the database transaction before slow workbook I/O;
+5. resolves the authoritative current final valuation again;
+6. requires the exact same final snapshot ID and semantic SHA;
+7. calls the writer only after that revalidation succeeds.
 
-## Supported-profile write contract
+The SQLCipher implementation uses `BEGIN IMMEDIATE` for the payload-freeze transaction. The accepted E1-PR-004 resolver remains unchanged, avoiding nested persistence transactions.
 
-`WorkbookOutputProfile` adds a second, explicit layer above `ExcelTemplateProfile`:
+A deterministic regression mutates a C1 decision after the initial resolve and before payload completion. The authoritative second resolve rejects the stale final evidence and the writer receives no call.
 
-- exact source exemplar SHA;
-- exact writable cells;
-- read-only fixed source bindings;
-- accepted compatibility transformations;
-- frozen output-consumer formulas.
+## Corrective closure — IR-002 race-safe publication ownership
 
-No write permission is inferred from the historical mapping matrix.
+The original writer used an early `output.exists()` check followed by deterministic temp naming and final `os.replace()`. That could overwrite a destination created after the pre-check, and generic exception cleanup could remove a foreign destination.
 
-The N08 profile writes only direct canonical subject/TSSS inputs, all 33 direct C1-C11 human decision cells, and `Phieu TTTT!E5` through its already accepted locality compatibility transformation.
+The corrected writer:
 
-Direct source inspection exposed several historical `input_or_derived` cells that are formulas in the actual exemplar. These are explicitly not writable. Every runtime formula cell is dynamically protected even when it is not one of the smaller frozen fingerprint-signature set.
+- creates a unique attempt-owned `.tmp.xlsx` using `tempfile.mkstemp()` in the destination directory;
+- places save, normalization, reopen, structural verification and publication in a cleanup scope covering the owned temp;
+- publishes with `os.link(temporary, output)`, giving create-if-absent semantics instead of replacement semantics;
+- treats an occupied destination at publication time as a fail-closed conflict;
+- never blindly deletes `output_path` on failure;
+- only removes an output during exceptional post-publication cleanup when `os.path.samefile()` proves it is the same attempt-owned inode;
+- removes normalization staging and partial save temp files.
 
-## Canonical application payload
+Windows regression tests prove:
 
-`WorkbookOutputService` accepts only:
+- a destination sentinel created after initial validation is not overwritten or deleted;
+- two competing attempts for one output produce at most one success;
+- an injected `Workbook.save()` failure cleans the owned partial temp without deleting a foreign destination.
 
-- case ID;
-- source/template path;
-- new output path.
+## Preserved workbook contract
 
-It obtains current evidence from persistence and the accepted upstream gates:
+The corrective loop preserves the original E1-PR-005 contract:
 
-- active case/profile;
-- current E1-PR-004 final valuation;
-- current subject and parcel;
-- supported land components;
-- exactly TSSS01/TSSS02/TSSS03;
-- current market observations;
-- required typed characteristics;
-- complete explicit CURRENT C1-C11 decisions.
+- explicit `WorkbookOutputProfile` write allowlist;
+- no write authority inferred from historical mapping labels;
+- exact N08 source-exemplar SHA;
+- all runtime formula cells protected except the accepted `Phieu TTTT!E5` compatibility transformation;
+- all 33 direct C1–C11 human decision cells writable with explicit-zero semantics;
+- canonical market factor `1 - negotiation_rate`, never reverse-solved from rounded negotiated output;
+- protected G181/G182/`Offical!E32` consumer formulas;
+- source workbook never edited in place;
+- deterministic generated package bytes for identical tested source/payload;
+- generated artifact binds exact final-valuation snapshot ID/SHA;
+- `WorkbookGenerated=true` and `excel_qualification_status=NOT_RUN`;
+- `openpyxl==3.1.5` remains confined to the concrete adapter/runtime boundary.
 
-The writer therefore never receives an arbitrary caller-controlled cell/value map from the application API.
+## Direct N08 source evidence
 
-The artifact binds the exact current final-valuation snapshot ID and semantic SHA.
-
-## Market normalization export
-
-The frozen workbook stores transaction-success factor (`0.85`) while the accepted canonical model stores fractional negotiation rate (`0.15`). E1-PR-005 uses:
-
-```text
-transaction_success_factor = 1 - canonical_negotiation_rate
-```
-
-The implementation deliberately rejects a missing canonical rate rather than reverse-solving from the rounded negotiated-price workbook result.
-
-## Copy-on-write / fail-closed behavior
-
-The writer:
-
-1. requires source/output `.xlsx` paths;
-2. refuses in-place editing;
-3. refuses an already existing output;
-4. verifies source SHA;
-5. verifies accepted profile/fingerprint and external-link state;
-6. validates read-only fixed source compatibility values;
-7. verifies frozen G181/G182/`Offical!E32` consumer formulas;
-8. scans all actual source formula cells and blocks normal writes to them;
-9. applies only declared writes/transformation;
-10. saves to a valid temporary `.xlsx`;
-11. normalizes XLSX package entry ordering/timestamps for deterministic bytes;
-12. reopens and re-verifies the generated workbook;
-13. confirms original formulas remain except declared transformation targets;
-14. confirms changed cells are a subset of the explicit allowlist;
-15. rechecks source SHA unchanged;
-16. atomically moves the completed artifact into the requested new output path.
-
-Failures clean up the incomplete output.
-
-## Artifact evidence
-
-Successful generation returns:
-
-- profile ID/version;
-- source/output paths;
-- source SHA;
-- output SHA;
-- exact final-valuation source binding;
-- generation timestamp;
-- changed cells;
-- applied compatibility transformations;
-- `WorkbookGenerated=true`;
-- `excel_qualification_status=NOT_RUN`.
-
-The artifact type explicitly refuses a `PASS` Excel qualification claim from this generation boundary.
-
-## Direct source evidence
-
-The real N08 workbook remains external to Git and is bound by SHA:
+The external reference workbook remains outside Git and is identified by:
 
 `d410cfcc2263d7d50a436a79e192461f04b6863e6c3676a28da7a2eed287389c`
 
-Direct XLSX package/XML inspection of the Library source is recorded without workbook bytes in:
-
-`fixtures/N08_0038_OUTPUT_SOURCE_EVIDENCE_v1.json`
-
-Tests bind the N08 output profile to this evidence: direct writable cells, formula-backed read-only cells, 33 rate decisions, stale E5 transformation, market-factor semantics, and Gate B.10 consumers.
-
-## Gate B.10 preservation
-
-E1-PR-005 does not write output consumer cells. It preserves:
-
-```text
-G181 = ROUND(G169 + G178, 0)
-G182 = ROUND(G181, -6)
-Offical!E32 = Bangtinh!G181
-```
-
-The pre-rounded and final-rounded values therefore remain separate.
+`fixtures/N08_0038_OUTPUT_SOURCE_EVIDENCE_v1.json` is unchanged by the corrective loop.
 
 ## Verification
 
-Binding Windows run `32089429684` on implementation HEAD `0c3b693d272befde32da8f1521b4acf390fe592a`:
+Binding Windows run `32107305776` on corrective runtime-tested HEAD `3455c2353fbe8d0ef6ffab5adad91c9f88a85a9d`:
 
 - Microsoft Windows Server 2025 / Python 3.11.9;
+- dependency install: PASS;
 - diff hygiene: PASS;
 - compile: PASS;
-- full `tests/re`: **245 passed in 4.77s**;
-- focused E1-PR-005: **21 passed in 1.02s**;
-- tested merge-ref `9dc3c3f130c4bf1e16a7293b9bf60e7cd69adcff` tree `78d4a62e494875e954b604ef612f8edefe0eae6c` exactly equals the runtime-tested branch HEAD tree.
+- full `tests/re`: **249 passed in 6.08s**;
+- focused E1-PR-005 corrective suite: **25 passed in 1.56s**;
+- tested merge-ref `1386a3e34503b6f7a0f4c0c7afcebccd6e047955` tree `a1a2a03c9ac148b7f145261a500b8407b84b4a1e` exactly equals the corrective runtime-tested HEAD tree.
+
+Run `32089429684` is superseded by corrective source/test changes. Corrective attempt `32107120120` stopped at diff hygiene before compile/tests because historical Markdown evidence contained trailing whitespace and is non-binding.
 
 ## Explicit non-scope
 
-No claim is made for Microsoft Excel Desktop recalculation/qualification, E1-PR-006 workbench integration, E1-PR-007 end-to-end qualification, approval return/revision, generic template rewriting, CTXD engine, OCR/Maps, Historical Learning, or Epic 1 closure.
+No claim is made for Microsoft Excel Desktop recalculation/qualification, E1-PR-006 workbench integration, E1-PR-007 end-to-end qualification, approval return/revision, CTXD engine, OCR/Maps, Historical Learning or Epic 1 closure.
 
-The implementer does not self-issue acceptance. E1-PR-006 must not begin until an independent reviewer accepts the exact final E1-PR-005 review HEAD and PR #15 is merged using expected-head protection.
+The implementer does not self-issue acceptance. PR #15 must not merge and E1-PR-006 must not begin until independent re-review accepts the exact corrective review HEAD.
