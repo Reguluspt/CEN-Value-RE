@@ -1,6 +1,6 @@
 """openpyxl-backed workbook output adapter.
 
-This adapter preserves Excel as an output/compatibility surface.  It never
+This adapter preserves Excel as an output/compatibility surface. It never
 uses Excel formulas as CenValue calculation authority and never declares
 Microsoft Excel qualification PASS.
 """
@@ -30,7 +30,12 @@ from ..excel.fingerprint import (
     normalize_formula,
 )
 from ..excel.profile import ExternalLinkState, SheetState
-from .profile import WorkbookOutputProfile, WorkbookValueKind, WorkbookWriteBinding
+from .profile import (
+    WorkbookFixedSourceBinding,
+    WorkbookOutputProfile,
+    WorkbookValueKind,
+    WorkbookWriteBinding,
+)
 
 
 class WorkbookOutputError(RuntimeError):
@@ -105,6 +110,17 @@ def _cell_value_map(workbook) -> dict[str, object]:
     return values
 
 
+def _formula_cells(workbook) -> frozenset[str]:
+    output: set[str] = set()
+    for worksheet in workbook.worksheets:
+        for row in worksheet.iter_rows():
+            for cell in row:
+                value = cell.value
+                if isinstance(value, str) and value.startswith("="):
+                    output.add(f"{worksheet.title}!{cell.coordinate}")
+    return frozenset(output)
+
+
 def _external_link_state(workbook) -> ExternalLinkState:
     external_formula_cells: list[str] = []
     for worksheet in workbook.worksheets:
@@ -152,7 +168,7 @@ def _observe(workbook, profile: WorkbookOutputProfile, filename: str):
     )
 
 
-def _excel_value(binding: WorkbookWriteBinding, value: WorkbookScalar):
+def _coerce_value(binding, value: WorkbookScalar):
     if value is None:
         if binding.required:
             raise WorkbookWriteContractError(
@@ -176,6 +192,54 @@ def _excel_value(binding: WorkbookWriteBinding, value: WorkbookScalar):
             f"{binding.source_key} must be finite"
         )
     return result
+
+
+def _fixed_value_matches(
+    binding: WorkbookFixedSourceBinding,
+    *,
+    expected: WorkbookScalar,
+    actual: object,
+) -> bool:
+    expected_value = _coerce_value(binding, expected)
+    if binding.value_kind is WorkbookValueKind.TEXT:
+        return actual is not None and str(actual) == expected_value
+    if actual is None or isinstance(actual, bool):
+        return False
+    try:
+        actual_decimal = Decimal(str(actual))
+        tolerance = Decimal(binding.numeric_tolerance)
+    except (InvalidOperation, ValueError):
+        return False
+    return actual_decimal.is_finite() and abs(actual_decimal - expected_value) <= tolerance
+
+
+def _verify_fixed_source_bindings(
+    cached_workbook,
+    profile: WorkbookOutputProfile,
+    values,
+) -> None:
+    for binding in profile.fixed_source_bindings:
+        if binding.source_key not in values or values[binding.source_key] is None:
+            if binding.required:
+                raise WorkbookWriteContractError(
+                    f"required fixed source value {binding.source_key} is missing"
+                )
+            continue
+        sheet_name, coordinate = _split_cell(binding.cell)
+        if sheet_name not in cached_workbook.sheetnames:
+            raise WorkbookStructuralRegressionError(
+                f"fixed source worksheet missing: {sheet_name}"
+            )
+        actual = cached_workbook[sheet_name][coordinate].value
+        if not _fixed_value_matches(
+            binding,
+            expected=values[binding.source_key],
+            actual=actual,
+        ):
+            raise WorkbookWriteContractError(
+                f"current canonical value {binding.source_key} is incompatible with "
+                f"read-only exemplar cell {binding.cell}"
+            )
 
 
 def _normalize_xlsx_zip(path: Path) -> None:
@@ -261,15 +325,26 @@ class OpenPyxlWorkbookOutputWriter(WorkbookOutputWriter):
                 "source workbook SHA-256 does not match the supported exemplar"
             )
 
+        required_bindings = (
+            *profile.write_bindings,
+            *profile.fixed_source_bindings,
+            *profile.compatibility_bindings,
+        )
         missing = sorted(
             item.source_key
-            for item in (*profile.write_bindings, *profile.compatibility_bindings)
+            for item in required_bindings
             if item.required and (item.source_key not in values or values[item.source_key] is None)
         )
         if missing:
             raise WorkbookWriteContractError(
                 "required workbook mappings are missing: " + ", ".join(missing)
             )
+
+        cached = load_workbook(source, data_only=True, keep_links=True)
+        try:
+            _verify_fixed_source_bindings(cached, profile, values)
+        finally:
+            cached.close()
 
         workbook = load_workbook(source, data_only=False, keep_links=True)
         try:
@@ -279,22 +354,20 @@ class OpenPyxlWorkbookOutputWriter(WorkbookOutputWriter):
             ).require_supported()
             self._verify_consumers(workbook, profile)
             before_cells = _cell_value_map(workbook)
+            source_formula_cells = _formula_cells(workbook)
 
-            formula_cells = {
-                item.cell for item in profile.template_profile.formula_signatures
-            }
             applied_transformations: list[str] = []
             for binding in profile.write_bindings:
-                if binding.cell in formula_cells:
+                if binding.cell in source_formula_cells:
                     raise WorkbookWriteContractError(
-                        f"protected formula cell cannot be written: {binding.cell}"
+                        f"source formula cell cannot be written: {binding.cell}"
                     )
                 sheet_name, coordinate = _split_cell(binding.cell)
                 if sheet_name not in workbook.sheetnames:
                     raise WorkbookStructuralRegressionError(
                         f"mapped worksheet missing: {sheet_name}"
                     )
-                workbook[sheet_name][coordinate] = _excel_value(
+                workbook[sheet_name][coordinate] = _coerce_value(
                     binding, values.get(binding.source_key)
                 )
 
@@ -310,7 +383,7 @@ class OpenPyxlWorkbookOutputWriter(WorkbookOutputWriter):
                     value_kind=binding.value_kind,
                     required=binding.required,
                 )
-                workbook[sheet_name][coordinate] = _excel_value(
+                workbook[sheet_name][coordinate] = _coerce_value(
                     surrogate, values.get(binding.source_key)
                 )
                 applied_transformations.append(binding.transformation_id)
@@ -332,8 +405,19 @@ class OpenPyxlWorkbookOutputWriter(WorkbookOutputWriter):
                 ).require_supported()
                 self._verify_consumers(generated, profile)
                 after_cells = _cell_value_map(generated)
+                after_formula_cells = _formula_cells(generated)
             finally:
                 generated.close()
+
+            expected_formula_cells = source_formula_cells - set(
+                item.cell for item in profile.compatibility_bindings
+            )
+            missing_formulas = sorted(expected_formula_cells - after_formula_cells)
+            if missing_formulas:
+                raise WorkbookStructuralRegressionError(
+                    "source formulas disappeared outside declared compatibility transformations: "
+                    + ", ".join(missing_formulas)
+                )
 
             changed = tuple(
                 sorted(
