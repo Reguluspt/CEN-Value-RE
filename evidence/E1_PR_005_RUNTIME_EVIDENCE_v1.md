@@ -1,11 +1,11 @@
 # E1-PR-005 — Runtime Evidence v1
 
-**Date:** 2026-08-18  
-**Repository:** `Reguluspt/CEN-Value-RE`  
-**PR:** #15  
-**Accepted base:** `f14018b19afcdb1cf600f46524e18f8ea2d3f4de`  
-**Runtime-tested implementation HEAD:** `0c3b693d272befde32da8f1521b4acf390fe592a`  
-**Binding GitHub Actions run:** `32089429684`  
+**Date:** 2026-08-18
+**Repository:** `Reguluspt/CEN-Value-RE`
+**PR:** #15
+**Accepted base:** `f14018b19afcdb1cf600f46524e18f8ea2d3f4de`
+**Runtime-tested implementation HEAD:** `0c3b693d272befde32da8f1521b4acf390fe592a`
+**Binding GitHub Actions run:** `32089429684`
 **Gate:** `WorkbookGenerationGate`
 
 ## 1. Binding environment and result
