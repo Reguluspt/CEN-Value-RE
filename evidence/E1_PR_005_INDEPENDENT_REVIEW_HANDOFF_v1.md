@@ -33,7 +33,7 @@ Do not redo discovery/design. The original independent review accepted all other
 - `E1PR005-IR-001` — canonical workbook payload could drift away from the final-valuation snapshot it claimed to bind;
 - `E1PR005-IR-002` — final output publication could overwrite/delete a foreign destination and leak a partial temp under failure/race conditions.
 
-The corrective implementation addresses these two findings. Independent re-review is required to decide whether they are CLOSED. Verify no regression to the previously accepted write/profile/formula/Gate B.10/qualification semantics.
+The corrective implementation addresses these findings. Independent re-review alone determines closure. Verify no regression to the previously accepted write/profile/formula/Gate B.10/qualification semantics.
 
 ## E1PR005-IR-001 corrective behavior to verify
 
@@ -49,17 +49,9 @@ The corrective implementation addresses these two findings. Independent re-revie
 
 The SQLCipher UoW uses `BEGIN IMMEDIATE`. The accepted E1-PR-004 resolver itself was not altered, so nested transactions are not introduced.
 
-Acceptance proof to inspect:
+Acceptance proof to inspect: `tests/re/test_workbook_output_service.py`.
 
-`tests/re/test_workbook_output_service.py`
-
-A deterministic test changes a C1 decision after the initial final resolve and before payload completion. Expected result:
-
-- second authoritative final resolution fails;
-- generation rejects;
-- `WorkbookOutputWriter.generate()` is not called.
-
-Normal path must still bind the exact final snapshot ID/SHA.
+A deterministic test changes a C1 decision after the initial final resolve and before payload completion. Expected result: second authoritative final resolution fails, generation rejects, and `WorkbookOutputWriter.generate()` is not called. Normal path must still bind the exact final snapshot ID/SHA.
 
 ## E1PR005-IR-002 corrective behavior to verify
 
@@ -72,9 +64,7 @@ Normal path must still bind the exact final snapshot ID/SHA.
 - uses `os.path.samefile()` before any exceptional cleanup of a published output;
 - cleans normalization staging and partial save temps.
 
-Acceptance proof to inspect:
-
-`tests/re/test_workbook_output_publication_corrective.py`
+Acceptance proof to inspect: `tests/re/test_workbook_output_publication_corrective.py`.
 
 Required Windows-proven vectors:
 
@@ -84,19 +74,7 @@ Required Windows-proven vectors:
 
 ## Preserved accepted behavior
 
-Verify corrective changes do not weaken:
-
-- exact N08 source SHA/profile qualification;
-- explicit write allowlist; historical mapping labels remain non-authoritative;
-- all runtime formula cells read-only except frozen `Phieu TTTT!E5` transformation;
-- 33 direct C1–C11 cells and explicit-zero semantics;
-- canonical transaction factor `1 - negotiation_rate`, no reverse-solving;
-- G181/G182/`Offical!E32` Gate B.10 formulas;
-- source workbook never edited in place;
-- deterministic package SHA for identical tested source/payload;
-- artifact binding to exact final valuation snapshot ID/SHA;
-- `WorkbookGenerated=true`, `excel_qualification_status=NOT_RUN`;
-- architecture guard against `openpyxl`/adapter imports in domain/application/ports.
+Verify corrective changes do not weaken exact N08 source SHA/profile qualification, explicit write allowlist, runtime formula protection, the frozen E5 transformation, 33 direct C1–C11 cells and explicit-zero semantics, `1 - negotiation_rate` market factor, G181/G182/`Offical!E32`, copy-on-write source protection, deterministic package SHA, final-snapshot binding, `excel_qualification_status=NOT_RUN`, or architecture boundaries.
 
 ## Direct N08 source evidence
 
@@ -129,17 +107,7 @@ Only `32107305776` binds the corrective implementation.
 
 ## Authority
 
-Review against at least:
-
-- `epic-1/EPIC_1_IMPLEMENTATION_PACKET_v1.md`;
-- `epic-1/EPIC_1_PR_PLAN_v1.md`;
-- `epic-1/EPIC_1_ACCEPTANCE_MATRIX_v1.md`;
-- `epic-1/E1_PR_005_WORKBOOK_OUTPUT_CONTRACT_v1.md`;
-- `gate-b/GATE_B10_OUTPUT_CONSUMER_CONTRACT_v1.md`;
-- `gate-b/GATE_B14_DEPENDENCY_CLASSIFICATION_BASELINE.md`;
-- accepted Excel profile/fingerprint/compatibility-transformation contracts;
-- accepted E1-PR-001..004 currentness contracts;
-- `fixtures/N08_0038_OUTPUT_SOURCE_EVIDENCE_v1.json`.
+Review the accepted Epic 1 plan/acceptance matrix, `E1_PR_005_WORKBOOK_OUTPUT_CONTRACT_v1.md`, Gate B.10 and B.14, accepted Excel profile/fingerprint/transformation contracts, accepted E1-PR-001..004 currentness contracts, and `fixtures/N08_0038_OUTPUT_SOURCE_EVIDENCE_v1.json`.
 
 Brainstorm History remains provenance/design intent only where later frozen authority does not supersede it.
 
