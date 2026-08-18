@@ -29,6 +29,29 @@ class WorkbookWriteBinding:
 
 
 @dataclass(frozen=True, slots=True)
+class WorkbookFixedSourceBinding:
+    """Canonical value that must already be represented by source workbook state.
+
+    These bindings are deliberately read-only.  They cover legacy exemplar
+    formula-backed inputs that E1-PR-005 is not authorized to rewrite.
+    """
+
+    cell: str
+    source_key: str
+    value_kind: WorkbookValueKind
+    numeric_tolerance: str = "0.000000001"
+    required: bool = True
+
+    def __post_init__(self) -> None:
+        if "!" not in self.cell or not self.cell.strip():
+            raise ValueError("fixed source binding cell must use Sheet!A1 form")
+        if not self.source_key.strip():
+            raise ValueError("fixed source binding source_key must not be blank")
+        if not self.numeric_tolerance.strip():
+            raise ValueError("numeric_tolerance must not be blank")
+
+
+@dataclass(frozen=True, slots=True)
 class WorkbookCompatibilityBinding:
     transformation_id: str
     cell: str
@@ -65,6 +88,7 @@ class WorkbookOutputProfile:
     template_profile: ExcelTemplateProfile
     source_exemplar_sha256: str
     write_bindings: tuple[WorkbookWriteBinding, ...]
+    fixed_source_bindings: tuple[WorkbookFixedSourceBinding, ...] = ()
     compatibility_bindings: tuple[WorkbookCompatibilityBinding, ...] = ()
     output_consumers: tuple[WorkbookOutputConsumer, ...] = ()
 
@@ -75,16 +99,17 @@ class WorkbookOutputProfile:
             raise ValueError("source_exemplar_sha256 must be lowercase SHA-256 hex")
 
         write_cells = [item.cell for item in self.write_bindings]
+        fixed_cells = [item.cell for item in self.fixed_source_bindings]
         compat_cells = [item.cell for item in self.compatibility_bindings]
-        all_cells = write_cells + compat_cells
+        all_cells = write_cells + fixed_cells + compat_cells
         if len(all_cells) != len(set(all_cells)):
-            raise ValueError("workbook output writable cells must be unique")
+            raise ValueError("workbook output binding cells must be unique")
 
         formula_cells = {item.cell for item in self.template_profile.formula_signatures}
-        overlap = sorted(set(all_cells) & formula_cells)
+        overlap = sorted(set(write_cells + compat_cells) & formula_cells)
         if overlap:
             raise ValueError(
-                "workbook output bindings may not target protected formula signatures: "
+                "workbook output writable bindings may not target protected formula signatures: "
                 + ", ".join(overlap)
             )
 
