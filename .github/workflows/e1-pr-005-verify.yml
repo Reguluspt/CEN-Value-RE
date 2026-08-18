@@ -38,4 +38,4 @@ jobs:
 
       - name: Focused E1-PR-005 proof
         shell: pwsh
-        run: python -m pytest -q tests/re/test_workbook_output_profile.py tests/re/test_workbook_output_writer.py tests/re/test_workbook_output_service.py tests/re/test_architecture_boundaries.py
+        run: python -m pytest -q tests/re/test_workbook_output_profile.py tests/re/test_workbook_output_source_evidence.py tests/re/test_workbook_output_writer.py tests/re/test_workbook_output_service.py tests/re/test_architecture_boundaries.py
