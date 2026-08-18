@@ -24,7 +24,7 @@ function normalizeDecimalText(value) {
 
 function shiftDecimal(value, places) {
   const parsed = normalizeDecimalText(value);
-  const digits = `${parsed.whole}${parsed.fractional}`.replace(/^0+(?=\d)/, '') || '0';
+  const digits = `${parsed.whole}${parsed.fractional}` || '0';
   const currentPoint = parsed.whole.length;
   const nextPoint = currentPoint + places;
 
