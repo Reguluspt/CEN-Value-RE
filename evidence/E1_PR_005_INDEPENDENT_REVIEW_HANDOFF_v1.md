@@ -33,9 +33,9 @@ Do not redo discovery/design. The original independent review accepted all other
 - `E1PR005-IR-001` — canonical workbook payload could drift away from the final-valuation snapshot it claimed to bind;
 - `E1PR005-IR-002` — final output publication could overwrite/delete a foreign destination and leak a partial temp under failure/race conditions.
 
-Re-review these two closures and verify no regression to the previously accepted write/profile/formula/Gate B.10/qualification semantics.
+The corrective implementation addresses these two findings. Independent re-review is required to decide whether they are CLOSED. Verify no regression to the previously accepted write/profile/formula/Gate B.10/qualification semantics.
 
-## E1PR005-IR-001 closure to verify
+## E1PR005-IR-001 corrective behavior to verify
 
 `WorkbookOutputService.generate()` now follows:
 
@@ -61,7 +61,7 @@ A deterministic test changes a C1 decision after the initial final resolve and b
 
 Normal path must still bind the exact final snapshot ID/SHA.
 
-## E1PR005-IR-002 closure to verify
+## E1PR005-IR-002 corrective behavior to verify
 
 `OpenPyxlWorkbookOutputWriter` now:
 
