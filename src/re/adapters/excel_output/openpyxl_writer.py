@@ -12,6 +12,7 @@ from decimal import Decimal, InvalidOperation
 from hashlib import sha256
 from pathlib import Path
 import os
+import re
 import tempfile
 import zipfile
 
@@ -60,6 +61,11 @@ class WorkbookStructuralRegressionError(WorkbookOutputError):
 
 
 _FIXED_ZIP_TIMESTAMP = (1980, 1, 1, 0, 0, 0)
+_CORE_MODIFIED_PATTERN = re.compile(
+    rb"(<dcterms:modified\b[^>]*>)(.*?)(</dcterms:modified>)",
+    re.DOTALL,
+)
+_FALLBACK_CORE_MODIFIED_VALUE = b"1980-01-01T00:00:00Z"
 
 
 def _sha256_file(path: Path) -> str:
@@ -243,7 +249,26 @@ def _verify_fixed_source_bindings(
             )
 
 
-def _normalize_xlsx_zip(path: Path) -> None:
+def _source_core_modified_value(path: Path) -> bytes:
+    """Read the source package's stable modified value for output canonicalization.
+
+    openpyxl updates docProps/core.xml dcterms:modified to wall-clock time on every
+    save. Reusing the source value keeps package metadata deterministic without
+    inventing generation time as workbook business evidence.
+    """
+
+    with zipfile.ZipFile(path, "r") as package:
+        try:
+            core = package.read("docProps/core.xml")
+        except KeyError:
+            return _FALLBACK_CORE_MODIFIED_VALUE
+    match = _CORE_MODIFIED_PATTERN.search(core)
+    if match is None:
+        return _FALLBACK_CORE_MODIFIED_VALUE
+    return match.group(2)
+
+
+def _normalize_xlsx_zip(path: Path, *, source_modified_value: bytes) -> None:
     normalized = path.with_suffix(path.suffix + ".normalized")
     try:
         with zipfile.ZipFile(path, "r") as source, zipfile.ZipFile(
@@ -251,6 +276,14 @@ def _normalize_xlsx_zip(path: Path) -> None:
         ) as target:
             for info in sorted(source.infolist(), key=lambda item: item.filename):
                 data = source.read(info.filename)
+                if info.filename == "docProps/core.xml":
+                    match = _CORE_MODIFIED_PATTERN.search(data)
+                    if match is not None:
+                        data = (
+                            data[: match.start(2)]
+                            + source_modified_value
+                            + data[match.end(2) :]
+                        )
                 clean = zipfile.ZipInfo(info.filename, _FIXED_ZIP_TIMESTAMP)
                 clean.compress_type = info.compress_type
                 clean.comment = info.comment
@@ -375,6 +408,7 @@ class OpenPyxlWorkbookOutputWriter(WorkbookOutputWriter):
             raise WorkbookSourceHashMismatchError(
                 "source workbook SHA-256 does not match the supported exemplar"
             )
+        source_modified_value = _source_core_modified_value(source)
 
         required_bindings = (
             *profile.write_bindings,
@@ -452,7 +486,10 @@ class OpenPyxlWorkbookOutputWriter(WorkbookOutputWriter):
             finally:
                 workbook.close()
 
-            _normalize_xlsx_zip(temporary)
+            _normalize_xlsx_zip(
+                temporary,
+                source_modified_value=source_modified_value,
+            )
             generated = load_workbook(temporary, data_only=False, keep_links=True)
             try:
                 after_observation = _observe(generated, profile, output.name)
