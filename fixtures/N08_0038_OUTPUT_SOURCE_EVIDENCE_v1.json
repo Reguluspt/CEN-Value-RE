@@ -1,0 +1,78 @@
+{
+  "schema_version": "1",
+  "source_workbook": {
+    "sha256": "d410cfcc2263d7d50a436a79e192461f04b6863e6c3676a28da7a2eed287389c",
+    "profile_id": "cenvalue-re-n08-0038-v1",
+    "profile_version": "1",
+    "inspection_basis": "direct XLSX package/XML inspection of the frozen N08 exemplar; workbook bytes remain external to Git"
+  },
+  "formula_backed_read_only_cells": [
+    "Nhập liệu!F36",
+    "Nhập liệu!I31",
+    "Nhập liệu!F38",
+    "Nhập liệu!H47",
+    "Phieu TTTT!B18",
+    "Phieu TTTT!G18",
+    "Phieu TTTT!L18",
+    "Phieu TTTT!D29",
+    "Phieu TTTT!D35",
+    "Phieu TTTT!I29",
+    "Phieu TTTT!N29",
+    "Phieu TTTT!N35",
+    "Phieu TTTT!L55",
+    "Bangtinh!G181",
+    "Bangtinh!G182",
+    "Offical!E32"
+  ],
+  "direct_writable_cells_verified": [
+    "Nhập liệu!F7",
+    "Nhập liệu!F9",
+    "Nhập liệu!G16",
+    "Nhập liệu!G17",
+    "Nhập liệu!G18",
+    "Nhập liệu!K18",
+    "Nhập liệu!F42",
+    "Nhập liệu!H46",
+    "Nhập liệu!H48",
+    "Phieu TTTT!B15",
+    "Phieu TTTT!B19",
+    "Phieu TTTT!D34",
+    "Phieu TTTT!D38",
+    "Phieu TTTT!B55",
+    "Phieu TTTT!B58",
+    "Phieu TTTT!G15",
+    "Phieu TTTT!G19",
+    "Phieu TTTT!I34",
+    "Phieu TTTT!I35",
+    "Phieu TTTT!I38",
+    "Phieu TTTT!G55",
+    "Phieu TTTT!G58",
+    "Phieu TTTT!L15",
+    "Phieu TTTT!L19",
+    "Phieu TTTT!N34",
+    "Phieu TTTT!N38",
+    "Phieu TTTT!L58"
+  ],
+  "adjustment_decision_cells": {
+    "columns": ["F", "G", "H"],
+    "rows": [55, 60, 65, 70, 75, 80, 85, 90, 95, 100, 105],
+    "count": 33,
+    "storage": "direct numeric values including explicit zero decisions"
+  },
+  "known_compatibility_formula": {
+    "cell": "Phieu TTTT!E5",
+    "state": "known stale self-reference",
+    "allowed_transformation_id": "localize-stale-phieu-tttt-e5"
+  },
+  "market_normalization_evidence": {
+    "asking_price_cells": ["Phieu TTTT!B15", "Phieu TTTT!G15", "Phieu TTTT!L15"],
+    "transaction_success_factor_cells": ["Phieu TTTT!B19", "Phieu TTTT!G19", "Phieu TTTT!L19"],
+    "negotiated_price_formula_cells": ["Phieu TTTT!B18", "Phieu TTTT!G18", "Phieu TTTT!L18"],
+    "rule": "writer derives workbook transaction-success factor as 1 - canonical fractional negotiation rate; it does not reverse-solve from rounded negotiated-price outputs"
+  },
+  "gate_b10_consumers": {
+    "Bangtinh!G181": "=ROUND(G169+G178,0)",
+    "Bangtinh!G182": "=ROUND(G181,-6)",
+    "Offical!E32": "=Bangtinh!G181"
+  }
+}
