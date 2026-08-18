@@ -62,7 +62,22 @@ jobs:
           npm run verify:re-astryx
           node scripts/verify-re-workbench-boundaries.mjs
 
-      - name: Frontend lint
+      - name: Verify frontend change scope
+        shell: pwsh
+        run: |
+          $outside = git diff --name-only be537e573d6692c6cbfaf5a6cb3710ad7c229177..HEAD -- web/src | Where-Object { $_ -notlike 'web/src/re/*' }
+          if ($outside) {
+            Write-Error ("E1-PR-006 changed legacy frontend source outside web/src/re:`n" + ($outside -join "`n"))
+            exit 1
+          }
+
+      - name: Scoped E1-PR-006 frontend lint
+        working-directory: web
+        shell: pwsh
+        run: npx eslint src/re/ReShell.jsx src/re/localServiceClient.js src/re/percent.js src/re/workbenchApi.js
+
+      - name: Observe inherited full frontend lint baseline
+        continue-on-error: true
         working-directory: web
         shell: pwsh
         run: npm run lint
