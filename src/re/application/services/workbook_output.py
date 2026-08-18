@@ -64,20 +64,26 @@ def _required_characteristic(records, key: str):
     return _characteristic_value(matches[0])
 
 
-def _transaction_success_factor(asking: str, negotiated: str) -> str:
-    asking_decimal = Decimal(asking)
-    negotiated_decimal = Decimal(negotiated)
-    if asking_decimal <= 0:
+def _transaction_success_factor(negotiation_rate_pct: str | None) -> str:
+    """Convert the canonical fractional negotiation rate to workbook factor.
+
+    The legacy workbook stores the factor itself (for example 0.85) while the
+    accepted E1-PR-001 model stores the fractional negotiation rate (0.15).
+    Do not reverse-solve this factor from rounded negotiated-price output.
+    """
+
+    if negotiation_rate_pct is None:
         raise WorkbookOutputPrerequisiteError(
-            "comparable asking price must be positive for workbook normalization"
+            "canonical negotiation rate is required for workbook market normalization"
+        )
+    rate = Decimal(negotiation_rate_pct)
+    if not rate.is_finite() or rate < 0 or rate >= 1:
+        raise WorkbookOutputPrerequisiteError(
+            "canonical negotiation rate must be a fraction in [0, 1)"
         )
     with localcontext() as context:
         context.prec = 50
-        result = negotiated_decimal / asking_decimal
-    if result <= 0:
-        raise WorkbookOutputPrerequisiteError(
-            "comparable transaction success factor must be positive"
-        )
+        result = Decimal("1") - rate
     return str(result.normalize())
 
 
@@ -139,6 +145,10 @@ class WorkbookOutputService:
                 "N08 Walking Skeleton output requires exactly one current subject parcel"
             )
         parcel = parcels[0]
+        if parcel.total_area_m2 is None:
+            raise WorkbookOutputPrerequisiteError(
+                "subject parcel total area is required for N08 workbook compatibility"
+            )
 
         components = tuple(
             item
@@ -180,6 +190,7 @@ class WorkbookOutputService:
             "subject.longitude": subject.longitude,
             "subject.parcel_number": parcel.parcel_number,
             "subject.map_sheet_number": parcel.map_sheet_number,
+            "subject.total_area_m2": parcel.total_area_m2,
             "subject.noncompliant_unit_price": noncompliant[0].unit_price_vnd_per_m2,
             "subject.compliant_area_m2": compliant[0].area_m2,
             "subject.noncompliant_area_m2": noncompliant[0].area_m2,
@@ -223,8 +234,7 @@ class WorkbookOutputService:
                     f"comparable.{order}.asking_price": observation.asking_or_sale_price_vnd,
                     f"comparable.{order}.negotiated_price": observation.negotiated_price_vnd,
                     f"comparable.{order}.transaction_success_factor": _transaction_success_factor(
-                        observation.asking_or_sale_price_vnd,
-                        observation.negotiated_price_vnd,
+                        observation.negotiation_rate_pct
                     ),
                     f"comparable.{order}.area_m2": _required_characteristic(
                         characteristics, "area_m2"
