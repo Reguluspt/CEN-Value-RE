@@ -1,7 +1,8 @@
 # E1-PR-006 — Local Service + Astryx Manual Workbench Integration Contract v1
 
 **Status:** IMPLEMENTATION CONTRACT — EPIC 1
-**Accepted base:** `be537e573d6692c6cbfaf5a6cb3710ad7c229177`
+**Accepted base:** `f68ce4c62280b2859b7db0e8f0fc75b52374bb67`
+**Original implementation base:** `be537e573d6692c6cbfaf5a6cb3710ad7c229177`
 **Gate:** `ManualWorkbenchGate`
 
 ## 1. Purpose and authority
