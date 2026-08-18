@@ -5,6 +5,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Mapping, Protocol
 
+from .persistence import (
+    LandParcelRepository,
+    MarketObservationRepository,
+    PropertyCharacteristicRepository,
+)
+from .valuation_persistence import FinalValuationUnitOfWork
+
 WorkbookScalar = str | int | bool | None
 
 
@@ -59,3 +66,11 @@ class WorkbookOutputWriter(Protocol):
         source_binding: WorkbookGenerationSourceBinding,
         generated_at: str,
     ) -> WorkbookGenerationArtifact: ...
+
+
+class WorkbookOutputUnitOfWork(FinalValuationUnitOfWork, Protocol):
+    """Read boundary required to build a workbook payload from canonical state."""
+
+    land_parcels: LandParcelRepository
+    property_characteristics: PropertyCharacteristicRepository
+    market_observations: MarketObservationRepository
