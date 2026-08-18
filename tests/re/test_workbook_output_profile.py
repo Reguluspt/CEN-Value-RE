@@ -5,10 +5,12 @@ def test_n08_write_contract_is_explicit_and_never_targets_formula_signatures():
     profile = N08_0038_OUTPUT_PROFILE
     formula_cells = {item.cell for item in profile.template_profile.formula_signatures}
     write_cells = {item.cell for item in profile.write_bindings}
+    fixed_cells = {item.cell for item in profile.fixed_source_bindings}
     compatibility_cells = {item.cell for item in profile.compatibility_bindings}
 
     assert write_cells
     assert write_cells.isdisjoint(formula_cells)
+    assert fixed_cells.isdisjoint(write_cells)
     assert compatibility_cells == {"Phieu TTTT!E5"}
     assert compatibility_cells.isdisjoint(formula_cells)
 
@@ -18,6 +20,23 @@ def test_n08_write_contract_is_explicit_and_never_targets_formula_signatures():
         for row in (55, 60, 65, 70, 75, 80, 85, 90, 95, 100, 105)
     }
     assert expected_rate_cells.issubset(write_cells)
+
+    # Direct workbook inspection proved these are formula-backed in the frozen
+    # exemplar, even though historical mapping labels some input-or-derived.
+    assert {
+        "Nhập liệu!F36",
+        "Nhập liệu!I31",
+        "Nhập liệu!H47",
+        "Phieu TTTT!D29",
+        "Phieu TTTT!D35",
+        "Phieu TTTT!I29",
+        "Phieu TTTT!N29",
+        "Phieu TTTT!N35",
+        "Phieu TTTT!L55",
+    }.issubset(fixed_cells)
+    assert "Phieu TTTT!B18" not in write_cells
+    assert "Phieu TTTT!G18" not in write_cells
+    assert "Phieu TTTT!L18" not in write_cells
 
 
 def test_gate_b10_output_consumers_explicitly_keep_g181_and_g182_distinct():
