@@ -390,7 +390,7 @@ class OpenPyxlWorkbookOutputWriter(WorkbookOutputWriter):
 
             self._verify_consumers(workbook, profile)
             output.parent.mkdir(parents=True, exist_ok=True)
-            temporary = output.with_suffix(output.suffix + ".tmp")
+            temporary = output.with_name(output.stem + ".tmp" + output.suffix)
             workbook.save(temporary)
         finally:
             workbook.close()
