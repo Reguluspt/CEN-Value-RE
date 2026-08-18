@@ -74,7 +74,7 @@ assert.equal(calls.length, 1);
 assert.equal(calls[0].url, 'http://127.0.0.1:43123/api/re/health/live');
 assert.equal(calls[0].options.headers['X-CenValue-RE-Launch-ID'], 'launch-1');
 assert.equal(calls[0].options.headers.Authorization, 'Bearer secret-1');
-assert.throws(() => reRequest('/outside/re'), /inside \/api\/re/);
+await assert.rejects(() => reRequest('/outside/re'), /inside \/api\/re/);
 
 clearReBootstrap();
 console.log('E1-PR-006 workbench boundary verification PASSED');
