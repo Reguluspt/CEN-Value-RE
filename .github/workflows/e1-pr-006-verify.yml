@@ -62,6 +62,13 @@ jobs:
           npm run verify:re-astryx
           node scripts/verify-re-workbench-boundaries.mjs
 
+      - name: Browser-level E1-PR-006 vertical smoke
+        working-directory: web
+        shell: pwsh
+        run: |
+          node --check scripts/verify-re-workbench-browser-smoke.mjs
+          node scripts/verify-re-workbench-browser-smoke.mjs
+
       - name: Verify frontend change scope
         shell: pwsh
         run: |
@@ -74,7 +81,7 @@ jobs:
       - name: Scoped E1-PR-006 frontend lint
         working-directory: web
         shell: pwsh
-        run: npx eslint src/re/ReShell.jsx src/re/localServiceClient.js src/re/percent.js src/re/workbenchApi.js
+        run: npx eslint src/re/ReShell.jsx src/re/localServiceClient.js src/re/percent.js src/re/workbenchApi.js src/re/smokeHarness.jsx
 
       - name: Observe inherited full frontend lint baseline
         continue-on-error: true
