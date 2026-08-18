@@ -12,6 +12,7 @@ from decimal import Decimal, InvalidOperation
 from hashlib import sha256
 from pathlib import Path
 import os
+import tempfile
 import zipfile
 
 from openpyxl import load_workbook
@@ -64,7 +65,7 @@ _FIXED_ZIP_TIMESTAMP = (1980, 1, 1, 0, 0, 0)
 def _sha256_file(path: Path) -> str:
     digest = sha256()
     with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+        for chunk in iter(lambda: handle.read(1024 * 1024, b""), b""):
             digest.update(chunk)
     return digest.hexdigest()
 
@@ -244,20 +245,70 @@ def _verify_fixed_source_bindings(
 
 def _normalize_xlsx_zip(path: Path) -> None:
     normalized = path.with_suffix(path.suffix + ".normalized")
-    with zipfile.ZipFile(path, "r") as source, zipfile.ZipFile(
-        normalized, "w", allowZip64=True
-    ) as target:
-        for info in sorted(source.infolist(), key=lambda item: item.filename):
-            data = source.read(info.filename)
-            clean = zipfile.ZipInfo(info.filename, _FIXED_ZIP_TIMESTAMP)
-            clean.compress_type = info.compress_type
-            clean.comment = info.comment
-            clean.extra = info.extra
-            clean.internal_attr = info.internal_attr
-            clean.external_attr = info.external_attr
-            clean.create_system = info.create_system
-            target.writestr(clean, data)
-    os.replace(normalized, path)
+    try:
+        with zipfile.ZipFile(path, "r") as source, zipfile.ZipFile(
+            normalized, "w", allowZip64=True
+        ) as target:
+            for info in sorted(source.infolist(), key=lambda item: item.filename):
+                data = source.read(info.filename)
+                clean = zipfile.ZipInfo(info.filename, _FIXED_ZIP_TIMESTAMP)
+                clean.compress_type = info.compress_type
+                clean.comment = info.comment
+                clean.extra = info.extra
+                clean.internal_attr = info.internal_attr
+                clean.external_attr = info.external_attr
+                clean.create_system = info.create_system
+                target.writestr(clean, data)
+        os.replace(normalized, path)
+    finally:
+        if normalized.exists():
+            normalized.unlink()
+
+
+def _new_owned_temporary(output: Path) -> Path:
+    descriptor, name = tempfile.mkstemp(
+        prefix=f".{output.stem}.",
+        suffix=".tmp.xlsx",
+        dir=output.parent,
+    )
+    os.close(descriptor)
+    return Path(name)
+
+
+def _publish_new_artifact(temporary: Path, output: Path) -> None:
+    """Atomically create output without replacing an existing destination.
+
+    The temporary file lives in the destination directory, so a hard-link
+    publication is a single-filesystem create-if-absent operation. Unlike
+    os.replace(), os.link() fails when the destination name already exists.
+    """
+
+    try:
+        os.link(temporary, output)
+    except FileExistsError as exc:
+        raise WorkbookWriteContractError(
+            "output_path became occupied before artifact publication"
+        ) from exc
+    except OSError as exc:
+        raise WorkbookWriteContractError(
+            "generated workbook could not be atomically published without overwrite"
+        ) from exc
+
+
+def _cleanup_owned_after_publish_failure(temporary: Path, output: Path) -> None:
+    """Clean only names still proven to reference this attempt's temp file."""
+
+    try:
+        if temporary.exists() and output.exists() and os.path.samefile(temporary, output):
+            output.unlink()
+    except OSError:
+        # Never fall back to deleting an unproven destination path.
+        pass
+    try:
+        if temporary.exists():
+            temporary.unlink()
+    except OSError:
+        pass
 
 
 class OpenPyxlWorkbookOutputWriter(WorkbookOutputWriter):
@@ -346,56 +397,61 @@ class OpenPyxlWorkbookOutputWriter(WorkbookOutputWriter):
         finally:
             cached.close()
 
-        workbook = load_workbook(source, data_only=False, keep_links=True)
+        output.parent.mkdir(parents=True, exist_ok=True)
+        if output.exists():
+            raise WorkbookWriteContractError("output_path must not already exist")
+
+        temporary: Path | None = None
+        published = False
         try:
-            before_observation = _observe(workbook, profile, source.name)
-            match_template_profile(
-                profile.template_profile, before_observation
-            ).require_supported()
-            self._verify_consumers(workbook, profile)
-            before_cells = _cell_value_map(workbook)
-            source_formula_cells = _formula_cells(workbook)
+            workbook = load_workbook(source, data_only=False, keep_links=True)
+            try:
+                before_observation = _observe(workbook, profile, source.name)
+                match_template_profile(
+                    profile.template_profile, before_observation
+                ).require_supported()
+                self._verify_consumers(workbook, profile)
+                before_cells = _cell_value_map(workbook)
+                source_formula_cells = _formula_cells(workbook)
 
-            applied_transformations: list[str] = []
-            for binding in profile.write_bindings:
-                if binding.cell in source_formula_cells:
-                    raise WorkbookWriteContractError(
-                        f"source formula cell cannot be written: {binding.cell}"
+                applied_transformations: list[str] = []
+                for binding in profile.write_bindings:
+                    if binding.cell in source_formula_cells:
+                        raise WorkbookWriteContractError(
+                            f"source formula cell cannot be written: {binding.cell}"
+                        )
+                    sheet_name, coordinate = _split_cell(binding.cell)
+                    if sheet_name not in workbook.sheetnames:
+                        raise WorkbookStructuralRegressionError(
+                            f"mapped worksheet missing: {sheet_name}"
+                        )
+                    workbook[sheet_name][coordinate] = _coerce_value(
+                        binding, values.get(binding.source_key)
                     )
-                sheet_name, coordinate = _split_cell(binding.cell)
-                if sheet_name not in workbook.sheetnames:
-                    raise WorkbookStructuralRegressionError(
-                        f"mapped worksheet missing: {sheet_name}"
+
+                for binding in profile.compatibility_bindings:
+                    sheet_name, coordinate = _split_cell(binding.cell)
+                    if sheet_name not in workbook.sheetnames:
+                        raise WorkbookStructuralRegressionError(
+                            f"compatibility worksheet missing: {sheet_name}"
+                        )
+                    surrogate = WorkbookWriteBinding(
+                        cell=binding.cell,
+                        source_key=binding.source_key,
+                        value_kind=binding.value_kind,
+                        required=binding.required,
                     )
-                workbook[sheet_name][coordinate] = _coerce_value(
-                    binding, values.get(binding.source_key)
-                )
-
-            for binding in profile.compatibility_bindings:
-                sheet_name, coordinate = _split_cell(binding.cell)
-                if sheet_name not in workbook.sheetnames:
-                    raise WorkbookStructuralRegressionError(
-                        f"compatibility worksheet missing: {sheet_name}"
+                    workbook[sheet_name][coordinate] = _coerce_value(
+                        surrogate, values.get(binding.source_key)
                     )
-                surrogate = WorkbookWriteBinding(
-                    cell=binding.cell,
-                    source_key=binding.source_key,
-                    value_kind=binding.value_kind,
-                    required=binding.required,
-                )
-                workbook[sheet_name][coordinate] = _coerce_value(
-                    surrogate, values.get(binding.source_key)
-                )
-                applied_transformations.append(binding.transformation_id)
+                    applied_transformations.append(binding.transformation_id)
 
-            self._verify_consumers(workbook, profile)
-            output.parent.mkdir(parents=True, exist_ok=True)
-            temporary = output.with_name(output.stem + ".tmp" + output.suffix)
-            workbook.save(temporary)
-        finally:
-            workbook.close()
+                self._verify_consumers(workbook, profile)
+                temporary = _new_owned_temporary(output)
+                workbook.save(temporary)
+            finally:
+                workbook.close()
 
-        try:
             _normalize_xlsx_zip(temporary)
             generated = load_workbook(temporary, data_only=False, keep_links=True)
             try:
@@ -438,9 +494,8 @@ class OpenPyxlWorkbookOutputWriter(WorkbookOutputWriter):
                     "source workbook bytes changed during generation"
                 )
 
-            os.replace(temporary, output)
-            output_sha = _sha256_file(output)
-            return WorkbookGenerationArtifact(
+            output_sha = _sha256_file(temporary)
+            artifact = WorkbookGenerationArtifact(
                 profile_id=profile.profile_id,
                 profile_version=profile.profile_version,
                 template_path=str(source),
@@ -454,9 +509,26 @@ class OpenPyxlWorkbookOutputWriter(WorkbookOutputWriter):
                 workbook_generated=True,
                 excel_qualification_status="NOT_RUN",
             )
-        except Exception:
-            if temporary.exists():
+
+            _publish_new_artifact(temporary, output)
+            published = True
+            try:
                 temporary.unlink()
-            if output.exists():
-                output.unlink()
+            except OSError as exc:
+                _cleanup_owned_after_publish_failure(temporary, output)
+                raise WorkbookWriteContractError(
+                    "owned temporary workbook could not be cleaned after publication"
+                ) from exc
+            temporary = None
+            return artifact
+        except Exception:
+            if temporary is not None:
+                if published:
+                    _cleanup_owned_after_publish_failure(temporary, output)
+                else:
+                    try:
+                        if temporary.exists():
+                            temporary.unlink()
+                    except OSError:
+                        pass
             raise
