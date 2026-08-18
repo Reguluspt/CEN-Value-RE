@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 from dataclasses import replace
 
 import pytest
@@ -86,11 +87,16 @@ class _DecisionQueries:
 
 
 class _FinalResolver:
-    def __init__(self, snapshot):
+    def __init__(self, snapshot, *, revalidate=None):
         self.snapshot = snapshot
+        self.revalidate = revalidate
+        self.calls = 0
 
     def resolve_current(self, *, case_id):
+        self.calls += 1
         assert case_id == self.snapshot.case_id
+        if self.calls > 1 and self.revalidate is not None:
+            self.revalidate()
         return self.snapshot
 
 
@@ -115,7 +121,18 @@ class _Writer:
 
 
 class _Uow:
-    pass
+    def __init__(self):
+        self.atomic_calls = 0
+        self.on_atomic_enter = None
+
+    @contextmanager
+    def atomic(self):
+        self.atomic_calls += 1
+        callback = self.on_atomic_enter
+        self.on_atomic_enter = None
+        if callback is not None:
+            callback()
+        yield
 
 
 def _char(record_id, property_id, key, *, decimal=None, text=None):
@@ -309,9 +326,10 @@ def _fixture():
 def test_service_builds_writer_payload_only_from_current_canonical_state():
     uow, final = _fixture()
     writer = _Writer()
+    resolver = _FinalResolver(final)
     service = WorkbookOutputService(
         uow,
-        final_valuation=_FinalResolver(final),
+        final_valuation=resolver,
         writer=writer,
         now=lambda: "2026-08-18T08:00:00Z",
     )
@@ -322,6 +340,8 @@ def test_service_builds_writer_payload_only_from_current_canonical_state():
     )
 
     values = writer.call["values"]
+    assert uow.atomic_calls == 1
+    assert resolver.calls == 2
     assert writer.call["profile_id"] == "cenvalue-re-n08-0038-v1"
     assert writer.call["profile_version"] == "1"
     assert writer.call["source_binding"].final_valuation_snapshot_id == "final-1"
@@ -337,6 +357,45 @@ def test_service_builds_writer_payload_only_from_current_canonical_state():
     assert values["valuation.total_value_before_rounding_vnd"] == "19581412440"
     assert values["valuation.final_appraised_value_vnd"] == "19581000000"
     assert artifact.excel_qualification_status == "NOT_RUN"
+
+
+def test_service_rejects_drift_after_initial_final_resolution_before_writer_call():
+    uow, final = _fixture()
+    writer = _Writer()
+    original = uow.adjustment_decision_queries.records[0]
+
+    def drift_after_initial_resolution():
+        uow.adjustment_decision_queries.records[0] = replace(
+            original,
+            selected_rate_pct="-0.20",
+            selected_at="t2",
+            version=original.version + 1,
+        )
+
+    uow.on_atomic_enter = drift_after_initial_resolution
+
+    def authoritative_revalidation():
+        current = uow.adjustment_decision_queries.records[0]
+        if current.version != original.version:
+            raise RuntimeError("final valuation is stale after decision reselection")
+
+    resolver = _FinalResolver(final, revalidate=authoritative_revalidation)
+    service = WorkbookOutputService(
+        uow,
+        final_valuation=resolver,
+        writer=writer,
+    )
+
+    with pytest.raises(WorkbookOutputPrerequisiteError, match="current final valuation"):
+        service.generate(
+            case_id="case-1",
+            template_path="template.xlsx",
+            output_path="output.xlsx",
+        )
+
+    assert resolver.calls == 2
+    assert uow.atomic_calls == 1
+    assert writer.call is None
 
 
 def test_service_fails_closed_for_missing_required_canonical_mapping():
