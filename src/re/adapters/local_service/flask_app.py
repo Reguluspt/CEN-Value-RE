@@ -35,7 +35,11 @@ def _bearer_token() -> str | None:
     return token or None
 
 
-def create_re_blueprint(session: LaunchSession, manual_cases=None) -> Blueprint:
+def create_re_blueprint(
+    session: LaunchSession,
+    manual_cases=None,
+    manual_workbench=None,
+) -> Blueprint:
     """Create the bounded RE HTTP surface for one process launch."""
     blueprint = Blueprint("cenvalue_re_local", __name__, url_prefix="/api/re")
 
@@ -95,13 +99,28 @@ def create_re_blueprint(session: LaunchSession, manual_cases=None) -> Blueprint:
 
         register_manual_case_routes(blueprint, manual_cases)
 
+    if manual_workbench is not None:
+        from .workbench_routes import register_workbench_routes
+
+        register_workbench_routes(blueprint, manual_workbench)
+
     return blueprint
 
 
-def create_local_service_app(session: LaunchSession, manual_cases=None) -> Flask:
+def create_local_service_app(
+    session: LaunchSession,
+    manual_cases=None,
+    manual_workbench=None,
+) -> Flask:
     """Create the standalone local Flask application-service boundary."""
     app = Flask("cenvalue_re_local_service")
-    app.register_blueprint(create_re_blueprint(session, manual_cases=manual_cases))
+    app.register_blueprint(
+        create_re_blueprint(
+            session,
+            manual_cases=manual_cases,
+            manual_workbench=manual_workbench,
+        )
+    )
 
     @app.errorhandler(404)
     def not_found(_error_value):
