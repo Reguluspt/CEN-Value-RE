@@ -10,11 +10,11 @@
 
 ## Outcome
 
-E1-PR-005 implements the bounded supported-profile workbook generation slice for `cenvalue-re-n08-0038-v1@1`. The targeted corrective loop closes the two independent-review findings without redesigning the already accepted profile, formula, Gate B.10 or qualification boundaries.
+E1-PR-005 implements the bounded supported-profile workbook generation slice for `cenvalue-re-n08-0038-v1@1`. The targeted corrective loop addresses the two independent-review findings without redesigning the already accepted profile, formula, Gate B.10 or qualification boundaries.
 
 Excel remains an output/compatibility surface. CenValue canonical state remains calculation authority. No Microsoft Excel Desktop qualification or Epic 1 closure is claimed.
 
-## Corrective closure — IR-001 coherent payload provenance
+## Corrective response — IR-001 coherent payload provenance
 
 The original application flow could resolve a current final valuation and then build the workbook payload after that resolver transaction ended. A concurrent canonical change could therefore make the final snapshot stale while later reads supplied newer payload values.
 
@@ -32,7 +32,7 @@ The SQLCipher implementation uses `BEGIN IMMEDIATE` for the payload-freeze trans
 
 A deterministic regression mutates a C1 decision after the initial resolve and before payload completion. The authoritative second resolve rejects the stale final evidence and the writer receives no call.
 
-## Corrective closure — IR-002 race-safe publication ownership
+## Corrective response — IR-002 race-safe publication ownership
 
 The original writer used an early `output.exists()` check followed by deterministic temp naming and final `os.replace()`. That could overwrite a destination created after the pre-check, and generic exception cleanup could remove a foreign destination.
 
@@ -43,7 +43,7 @@ The corrected writer:
 - publishes with `os.link(temporary, output)`, giving create-if-absent semantics instead of replacement semantics;
 - treats an occupied destination at publication time as a fail-closed conflict;
 - never blindly deletes `output_path` on failure;
-- only removes an output during exceptional post-publication cleanup when `os.path.samefile()` proves it is the same attempt-owned inode;
+- only removes an output during exceptional post-publication cleanup when `os.path.samefile()` proves it is the same attempt-owned file;
 - removes normalization staging and partial save temp files.
 
 Windows regression tests prove:
