@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - agent/e1-pr-006-local-service-astryx-workbench
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
