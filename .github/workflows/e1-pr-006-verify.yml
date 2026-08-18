@@ -36,7 +36,7 @@ jobs:
 
       - name: Diff hygiene
         shell: pwsh
-        run: git diff --check be537e573d6692c6cbfaf5a6cb3710ad7c229177..HEAD
+        run: git diff --check f68ce4c62280b2859b7db0e8f0fc75b52374bb67..HEAD
 
       - name: Compile RE source
         shell: pwsh
@@ -65,7 +65,7 @@ jobs:
       - name: Verify frontend change scope
         shell: pwsh
         run: |
-          $outside = git diff --name-only be537e573d6692c6cbfaf5a6cb3710ad7c229177..HEAD -- web/src | Where-Object { $_ -notlike 'web/src/re/*' }
+          $outside = git diff --name-only f68ce4c62280b2859b7db0e8f0fc75b52374bb67..HEAD -- web/src | Where-Object { $_ -notlike 'web/src/re/*' }
           if ($outside) {
             Write-Error ("E1-PR-006 changed legacy frontend source outside web/src/re:`n" + ($outside -join "`n"))
             exit 1
