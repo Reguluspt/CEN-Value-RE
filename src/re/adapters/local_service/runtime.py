@@ -64,20 +64,34 @@ class LocalServiceBootstrap:
 class LocalServiceRuntime:
     """Own one listener and exactly one launch session.
 
+    Application capabilities are injected at composition time and are handed to
+    the Flask adapter only when the one-launch listener is created. The runtime
+    does not construct persistence or business services itself.
+
     A stopped runtime cannot be restarted. A new desktop launch must construct a
     new runtime, which necessarily creates a new launch ID and bearer token.
     """
 
     __slots__ = (
         "_config",
+        "_manual_cases",
+        "_manual_workbench",
         "_session",
         "_server",
         "_thread",
         "_state",
     )
 
-    def __init__(self, config: LocalServiceConfig | None = None) -> None:
+    def __init__(
+        self,
+        config: LocalServiceConfig | None = None,
+        *,
+        manual_cases=None,
+        manual_workbench=None,
+    ) -> None:
         self._config = config or LocalServiceConfig()
+        self._manual_cases = manual_cases
+        self._manual_workbench = manual_workbench
         self._session: LaunchSession | None = None
         self._server: Any | None = None
         self._thread: Thread | None = None
@@ -92,7 +106,11 @@ class LocalServiceRuntime:
             raise RuntimeError("local service runtime can only be started once")
 
         session, credential = LaunchSession.issue()
-        app = create_local_service_app(session)
+        app = create_local_service_app(
+            session,
+            manual_cases=self._manual_cases,
+            manual_workbench=self._manual_workbench,
+        )
         server = make_server(
             self._config.host,
             self._config.port,

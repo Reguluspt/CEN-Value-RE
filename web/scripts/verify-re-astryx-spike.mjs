@@ -19,6 +19,9 @@ const require = createRequire(import.meta.url);
 const pkg = JSON.parse(read('package.json'));
 const app = read('src/App.jsx');
 const shell = read('src/re/ReShell.jsx');
+const localServiceClient = read('src/re/localServiceClient.js');
+const percentBoundary = read('src/re/percent.js');
+const workbenchApi = read('src/re/workbenchApi.js');
 const css = read('src/re/astryx.css');
 const cssRulesOnly = stripCssComments(css);
 const generatedCore = read('src/re/generated/astryx-core.scoped.css');
@@ -40,10 +43,10 @@ assert(reRouteBlock.includes('<ProtectedRoute adminOnly={true}>'), '/re must rem
 assert(reRouteBlock.includes('<Suspense'), '/re must lazy-load behind Suspense');
 assert(!reRouteBlock.includes('<Layout>'), '/re must not reuse legacy Ant Design Layout');
 
-assert(shell.includes("from '@astryxdesign/core/AppShell'"), 'RE shell must use Astryx AppShell');
-assert(shell.includes("from '@astryxdesign/core/SideNav'"), 'RE shell must use Astryx SideNav');
-assert(shell.includes("from '@astryxdesign/core/FormLayout'"), 'RE shell must use Astryx FormLayout');
-assert(shell.includes("from '@astryxdesign/core/TextInput'"), 'RE shell must use Astryx TextInput');
+assert(shell.includes("from '@astryxdesign/core/AppShell'"), 'RE workbench must use Astryx AppShell');
+assert(shell.includes("from '@astryxdesign/core/SideNav'"), 'RE workbench must use Astryx SideNav');
+assert(shell.includes("from '@astryxdesign/core/Text'"), 'RE workbench must use Astryx Text');
+assert(shell.includes('data-re-workbench="e1-pr-006"'), 'RE workbench must expose the E1-PR-006 marker');
 assert(!shell.includes("from '@astryxdesign/core/theme'"), 'RE shell must not mount Astryx root Theme because it mutates documentElement');
 assert(!shell.includes("from '@astryxdesign/theme-neutral/built'"), 'RE shell must not use a root Theme provider');
 assert(shell.includes("import './generated/astryx-core.scoped.css'"), 'RE shell must import generated scoped Astryx core CSS');
@@ -56,13 +59,38 @@ const allowedLocalImports = new Set([
   './astryx.css',
   './generated/astryx-core.scoped.css',
   './generated/neutral-theme.scoped.css',
+  './localServiceClient',
+  './percent',
+  './workbenchApi',
 ]);
 const disallowedImports = importSources.filter((source) =>
   source !== 'react' &&
   !allowedLocalImports.has(source) &&
   !source.startsWith('@astryxdesign/')
 );
-assert(disallowedImports.length === 0, `RE shell has non-Astryx/application imports: ${disallowedImports.join(', ')}`);
+assert(disallowedImports.length === 0, `RE shell has disallowed infrastructure imports: ${disallowedImports.join(', ')}`);
+assert(!shell.includes('src/re/adapters'), 'Frontend must not import Python adapters');
+assert(!shell.includes('persistence'), 'Frontend must not import persistence internals');
+assert(!shell.includes('openpyxl'), 'Frontend must not import workbook runtime internals');
+
+assert(localServiceClient.includes("let bootstrapEnvelope = null"), 'Local-service bootstrap must be in-memory module state');
+assert(!localServiceClient.includes('localStorage'), 'Bearer bootstrap must not use localStorage');
+assert(!localServiceClient.includes('sessionStorage'), 'Bearer bootstrap must not use sessionStorage');
+assert(!localServiceClient.includes('document.cookie'), 'Bearer bootstrap must not use cookies');
+assert(localServiceClient.includes("path.startsWith('/api/re/')"), 'API client must constrain requests to /api/re');
+assert(localServiceClient.includes('Authorization: `Bearer ${bootstrapEnvelope.bearerToken}`'), 'API client must attach the launch bearer token in memory');
+assert(localServiceClient.includes('[LAUNCH_ID_HEADER]: bootstrapEnvelope.launchId'), 'API client must attach the current launch ID');
+
+assert(!percentBoundary.includes('parseFloat'), 'Percentage boundary must not use parseFloat');
+assert(!percentBoundary.includes('parseInt'), 'Percentage boundary must not use parseInt');
+assert(!percentBoundary.includes('Number('), 'Percentage boundary must not convert canonical percentages through Number');
+assert(!percentBoundary.includes('Math.'), 'Percentage boundary must not calculate percentages through binary Math helpers');
+assert(percentBoundary.includes('shiftDecimal(value, -2)'), 'Display percent must convert to canonical fraction by exact decimal shift');
+assert(percentBoundary.includes('shiftDecimal(String(value), 2)'), 'Canonical fraction must convert to display percent by exact decimal shift');
+
+assert(workbenchApi.includes("import { reRequest } from './localServiceClient'"), 'Workbench API must use the bounded local-service client');
+assert(!workbenchApi.includes('axios'), 'Workbench API must not create a second HTTP stack');
+assert(!workbenchApi.includes('fetch('), 'Workbench API must not bypass the credentialed local-service client');
 
 assert(!cssRulesOnly.includes('@import'), 'Local RE CSS must not import vendor/global styles directly');
 assert(cssRulesOnly.includes('.cenvalue-re-surface'), 'Compatibility reset must be scoped to .cenvalue-re-surface');
@@ -104,16 +132,16 @@ for (const entry of vendorExports) {
 }
 
 if (failures.length) {
-  console.error('E0-PR-002 static verification FAILED');
+  console.error('E1-PR-006 Astryx/workbench verification FAILED');
   for (const failure of failures) console.error(`- ${failure}`);
   process.exit(1);
 }
 
-console.log('E0-PR-002 static verification PASSED');
-console.log('- exact Astryx dependency pins present');
-console.log('- /re route is protected, lazy-loaded, and outside legacy Layout');
-console.log('- AppShell + SideNav + FormLayout + TextInput present');
-console.log('- RE shell has no root Astryx Theme provider/documentElement sync path');
+console.log('E1-PR-006 Astryx/workbench verification PASSED');
+console.log('- accepted Astryx pins and /re isolation remain intact');
+console.log('- /re remains admin-protected, lazy-loaded, and outside legacy Layout');
+console.log('- manual workbench uses the bounded credentialed /api/re client');
+console.log('- local-service bootstrap remains in memory only');
+console.log('- percentage conversion avoids binary floating-point helpers');
 console.log('- local RE CSS contains no vendor import or global :root/html[data-theme]/body rule');
-console.log('- generated vendor CSS deterministically rewrites Astryx globals to .cenvalue-re-surface');
-console.log('- known raw vendor :root/html[data-theme] mutation is retained as a negative control and eliminated before Vite sees the CSS');
+console.log('- generated vendor CSS remains deterministically scoped to .cenvalue-re-surface');
